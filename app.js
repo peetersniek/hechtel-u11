@@ -38,7 +38,9 @@ var ICONS={
   users:'<circle cx="9.5" cy="8" r="3.5"/><path d="M3.5 20v-1.2a4.3 4.3 0 0 1 4.3-4.3h3.4a4.3 4.3 0 0 1 4.3 4.3V20"/>',
   eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
   spin:'<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/>',
-  share:'<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/>'
+  share:'<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/>',
+  x:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  help:'<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7M12 17h.01"/>'
 };
 function ic(n){return '<svg class="i i-'+n+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[n]||'')+'</svg>';}
 
@@ -444,7 +446,7 @@ function viewLogin(){var st=S.login||{};
     '<details class="gx"><summary>Opent de link in een andere browser of app?</summary><p class="hint">Kopieer de link uit de mail en plak hem hier.</p><form data-form="useLink" class="row"><input type="url" id="lg-link" placeholder="Plak de link uit de mail" autocomplete="off" aria-label="Link uit de mail"><button class="btn primary" type="submit">Inloggen</button></form></details>'+
     '<p style="margin-top:16px"><button class="btn ghost" data-a="loginAgain">Ander e-mailadres of nieuwe link</button></p>');
   if(st.step==='confirm')return gate('Bevestig je e-mailadres','<p>Vul het e-mailadres in waarmee je de inloglink aanvroeg.</p><form data-form="confirmLink" class="row"><input type="email" id="lg-mail" autocomplete="email" required placeholder="naam@voorbeeld.be" aria-label="E-mailadres"><button class="btn primary" type="submit">Inloggen</button></form>');
-  return gate('Inloggen','<p>Log in met je e-mailadres. Je krijgt een link in je mailbox, een wachtwoord is niet nodig.</p><form data-form="login" class="row"><input type="email" id="lg-mail" autocomplete="email" required placeholder="naam@voorbeeld.be" aria-label="E-mailadres" value="'+esc(st.email||'')+'"><button class="btn primary" type="submit"'+(st.busy?' disabled':'')+'>Stuur link</button></form><p class="hint">Alleen e-mailadressen die de beheerder toevoegde, krijgen toegang.</p>');
+  return gate('Inloggen','<p>Log in met je e-mailadres. Je krijgt een link in je mailbox, een wachtwoord is niet nodig.</p><form data-form="login" class="row"><input type="email" id="lg-mail" autocomplete="email" required placeholder="naam@voorbeeld.be" aria-label="E-mailadres" value="'+esc(st.email||'')+'"><button class="btn primary" type="submit"'+(st.busy?' disabled':'')+'>Stuur link</button></form><p class="hint">Alleen e-mailadressen die de beheerder toevoegde, krijgen toegang.</p><p class="hint"><a href="handleiding.html">Eerste keer? Lees de korte handleiding.</a></p>');
 }
 function viewDenied(){return gate('Nog geen toegang','<p>Je bent aangemeld als <b>'+esc(S.user&&S.user.email)+'</b>, maar dat adres heeft nog geen toegang tot de planner. Vraag de beheerder om het toe te voegen.</p><p class="row" style="justify-content:center"><button class="btn" data-a="signOut">Afmelden</button><button class="btn ghost" data-a="retryAccess">Opnieuw proberen</button></p>');}
 function viewOnboard(){
@@ -504,15 +506,17 @@ function cardHTML(m){
   if(fl.length)h+='<div class="flags">'+fl.map(function(f){return flagHTML(f,m);}).join('')+'</div>';
   if(m.note)h+='<p class="note">'+esc(m.note)+'</p>';
   if(!cancel){
+    var mid=esc(m.id);
+    h+='<div class="sellbl"><span>Selectie</span><span class="count">'+sel.length+' spelers</span></div>';
     h+='<ul class="plist">'+sel.map(function(id){var p=S.players.get(id),isW=id===wid,isS=!wid&&id===sug,guest=p.team!==m.team;
-      return '<li class="pchip'+(isW?' was':'')+(isS?' sugg':'')+'"><button class="pname" data-a="pOut" data-id="'+esc(m.id)+'" data-p="'+esc(id)+'" title="Tik om uit de selectie te halen">'+esc(p.name)+(guest?'<small>'+(p.team==='X'?'extern':esc(p.team))+'</small>':'')+'</button><button class="pwas" data-a="pWas" data-id="'+esc(m.id)+'" data-p="'+esc(id)+'" aria-pressed="'+isW+'" aria-label="Was en broodjes: '+esc(p.name)+'" title="Was + broodjes">'+ic('shirt')+'</button></li>';}).join('')+'</ul>';
-    h+='<div class="bench">'+(bench.length?'<span class="lbl">Niet geselecteerd</span>':'')+bench.map(function(id){return '<button class="bchip" data-a="pIn" data-id="'+esc(m.id)+'" data-p="'+esc(id)+'">'+ic('plus')+esc(pName(id))+'</button>';}).join('')+'<button class="bchip add" data-a="addP" data-id="'+esc(m.id)+'">'+ic('plus')+'Andere speler</button></div>';
-    var w;
-    if(wid)w='Was + broodjes: <b class="g">'+esc(pName(wid))+'</b>';
-    else if(sug)w='Was + broodjes: <b class="g">'+esc(pName(sug))+'</b> <em>voorstel</em> <button class="mini" data-a="wasOk" data-id="'+esc(m.id)+'" data-p="'+esc(sug)+'">Bevestig</button>';
-    else w='Was + broodjes: <span class="mutedt">'+(past?'niet ingevuld':'tik op het shirtje bij een speler')+'</span>';
-    h+='<div class="mfoot"><div class="wasline">'+ic('shirt')+'<span>'+w+'</span><span class="count">'+sel.length+' spelers</span></div>'+
-      '<button class="trainers" data-a="trainers" data-id="'+esc(m.id)+'">Trainers: <b>'+esc(m.trainers||teamTrainers(m.team)||'niet ingevuld')+'</b>'+ic('edit')+'</button></div>';
+      return '<li class="pchip'+(isW?' was':'')+(isS?' sugg':'')+'"><span class="pname">'+((isW||isS)?ic('shirt'):'')+'<span class="pn-t">'+esc(p.name)+'</span>'+(guest?'<small>'+(p.team==='X'?'extern':esc(p.team))+'</small>':'')+'</span>'+
+        '<button class="pout" data-a="pOut" data-id="'+mid+'" data-p="'+esc(id)+'" aria-label="'+esc(p.name)+' uit de selectie halen" title="Uit de selectie halen">'+ic('x')+'</button></li>';}).join('')+'</ul>';
+    h+='<div class="bench">'+(bench.length?'<span class="lbl">Niet geselecteerd, tik om toe te voegen</span>':'')+bench.map(function(id){return '<button class="bchip" data-a="pIn" data-id="'+mid+'" data-p="'+esc(id)+'">'+ic('plus')+esc(pName(id))+'</button>';}).join('')+'<button class="bchip add" data-a="addP" data-id="'+mid+'">'+ic('plus')+'Andere speler</button></div>';
+    var wb;
+    if(wid)wb='<div class="wasbox set">'+ic('shirt')+'<span class="wt"><small>Was + broodjes</small><b>'+esc(pName(wid))+'</b></span><span class="wbtn"><button class="btn sm" data-a="wasPick" data-id="'+mid+'">Wijzig</button></span></div>';
+    else if(sug)wb='<div class="wasbox sugg">'+ic('shirt')+'<span class="wt"><small>Was + broodjes: voorstel</small><b>'+esc(pName(sug))+'</b></span><span class="wbtn"><button class="btn sm ok" data-a="wasOk" data-id="'+mid+'" data-p="'+esc(sug)+'">'+ic('check')+'Bevestig</button><button class="btn sm" data-a="wasPick" data-id="'+mid+'">Ander</button></span></div>';
+    else wb='<div class="wasbox none">'+ic('shirt')+'<span class="wt"><small>Was + broodjes</small><b>'+(past?'niet ingevuld':'nog niemand')+'</b></span><span class="wbtn"><button class="btn sm" data-a="wasPick" data-id="'+mid+'">Kies</button></span></div>';
+    h+='<div class="mfoot">'+wb+'<button class="trainers" data-a="trainers" data-id="'+mid+'">Trainers: <b>'+esc(m.trainers||teamTrainers(m.team)||'niet ingevuld')+'</b>'+ic('edit')+'</button></div>';
   }
   return h+'</div></article>';
 }
@@ -674,6 +678,10 @@ var SHEETS={
     return '<h2>Speler toevoegen</h2><p class="sub">'+esc(matchTitle(m))+'</p>'+(body||'<p class="hint">Alle gekende spelers staan al in de selectie.</p>')+
       '<h3>Nieuwe speler</h3><div class="row"><input type="text" id="ap-name" placeholder="Voornaam + initiaal" autocomplete="off" aria-label="Naam"><select id="ap-team" aria-label="Soort speler" style="max-width:48%"><option value="X">Extern (gastspeler)</option><option value="'+m.team+'">Vaste speler '+esc(teamLabel(m.team))+'</option><option value="'+ot+'">Vaste speler '+esc(teamLabel(ot))+'</option></select></div>'+
       acts('','<button class="btn ghost" data-a="closeSheet">Klaar</button><button class="btn primary" data-a="apNew">'+ic('plus')+'Toevoegen aan match</button>');},
+  wasPick:function(sh){var m=getM(sh.id);if(!m)return '';var sel=selection(m),st=wasStats(),cur=wasOf(m),sug=cur?null:S.sugg.get(m.id),mid=esc(m.id);
+    return '<h2>Was + broodjes</h2><p class="sub">'+esc(matchTitle(m))+'</p><p class="hint">Tik op wie de was en de broodjes doet. Het getal is hoe vaak die speler het dit seizoen al deed.</p>'+
+      '<div class="wpick">'+sel.map(function(id){var s=st.get(id);return '<button class="wp'+(id===cur?' on':'')+(id===sug?' sg':'')+'" data-a="wasSet" data-id="'+mid+'" data-p="'+esc(id)+'">'+ic('shirt')+'<span>'+esc(pName(id))+'</span><small>'+(s?s.n:0)+'×</small></button>';}).join('')+'</div>'+
+      acts(cur?'<button class="btn ghost spacer" data-a="wasSet" data-id="'+mid+'" data-p="">Niemand</button>':'','<button class="btn ghost" data-a="closeSheet">Annuleer</button>');},
   mmenu:function(sh){var m=getM(sh.id);if(!m)return '';var id=esc(m.id);
     return '<h2>Match</h2><p class="sub">'+esc(matchTitle(m))+'</p><div class="menu">'+
       '<button data-a="times" data-id="'+id+'">'+ic('clock')+'Verzamelen en notitie</button>'+
@@ -880,7 +888,9 @@ var ACT={
     setPlayers(d.id,sel.filter(function(x){return x!==d.p;}));toast(pName(d.p)+' staat niet meer in de selectie',function(){upd('matches',d.id,{players:prev,wasId:prevW});});},
   pIn:function(d){var m=getM(d.id);if(!m)return;var sel=selection(m);if(sel.indexOf(d.p)<0)setPlayers(d.id,sel.concat([d.p]));if(S.sheet&&S.sheet.kind==='addP')renderSheet();},
   pWas:function(d){var m=getM(d.id);if(!m)return;upd('matches',d.id,{wasId:m.wasId===d.p?null:d.p});},
-  wasOk:function(d){upd('matches',d.id,{wasId:d.p});},
+  wasOk:function(d){upd('matches',d.id,{wasId:d.p});toast('Was + broodjes: '+pName(d.p)+'.');},
+  wasPick:function(d){openSheet('wasPick',{id:d.id});},
+  wasSet:function(d){if(!getM(d.id))return;upd('matches',d.id,{wasId:d.p||null});closeSheet();toast(d.p?'Was + broodjes: '+pName(d.p)+'.':'Niemand ingevuld voor de was.');},
   addP:function(d){openSheet('addP',{id:d.id});},
   apNew:function(){var sh=S.sheet,m=getM(sh.id),nm=$('#ap-name').value.trim(),tm=$('#ap-team').value;if(!nm){toast('Vul een naam in.');return;}
     var pid=rid('p'),ord=tm==='X'?null:(plist().filter(function(p){return p.team===tm;}).reduce(function(a,p){return Math.max(a,Number(p.order)||0);},0)+1);

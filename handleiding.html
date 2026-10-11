@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Handleiding Hechtel U11 Planner</title>
+<meta name="description" content="Korte handleiding voor de trainers: zo maak je het wedstrijdschema van U11 A en B.">
+<meta name="theme-color" content="#141917">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Zelfde huisstijl als de planner: condensed koppen, rode accenten, groen voor was + broodjes.
+   Opbouw: korte stappen bovenaan, daarna per onderwerp tekst links en een gsm-screenshot rechts. */
+:root{
+  --bg:#ECF0EE; --sheet:#FFFFFF; --ink:#141917; --muted:#5B6762; --line:#D3DBD7; --line2:#E6ECE9;
+  --red:#D3211A; --mark:#E0141B; --green:#2C8C3F; --green-bg:#E1F2E4; --info:#2150B5; --info-bg:#E2E9FA; --warn:#8F5600; --warn-bg:#FFEFCF; --bad:#BE231C; --bad-bg:#FBE2DF;
+  --f-display:"Barlow Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0D1110; --sheet:#161C19; --ink:#E5ECE8; --muted:#93A19B; --line:#2C3632; --line2:#232B28;
+  --red:#FF5A4E; --green:#5DCB74; --green-bg:#163120; --info:#8FB0FF; --info-bg:#18233A; --warn:#F1B65B; --warn-bg:#36290F; --bad:#FF6E64; --bad-bg:#3A1714;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:76px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--f-body);padding-bottom:env(safe-area-inset-bottom,0px)}
+a{color:var(--info)}
+img{max-width:100%;height:auto;display:block}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.top .wrap{display:flex;align-items:center;gap:12px;min-height:58px}
+.crest{width:40px;height:40px;border-radius:9px;background:var(--ink);color:var(--sheet);display:grid;place-items:center;font:700 17px/1 var(--f-display);flex:none}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
+.brand b{display:block;font:700 19px/1 var(--f-display);text-transform:uppercase;letter-spacing:.02em}
+.brand small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.go{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:9px;background:var(--ink);color:var(--sheet);text-decoration:none;font-weight:600;font-size:15px;white-space:nowrap}
+.go:focus-visible,.toc a:focus-visible{outline:3px solid var(--info);outline-offset:2px}
+.go svg{width:18px;height:18px}
+.hero{padding-block:28px 6px}
+h1{font:700 40px/1 var(--f-display);text-transform:uppercase;letter-spacing:.01em;margin:0 0 10px;text-wrap:balance}
+.lead{margin:0;max-width:62ch;font-size:17px;color:var(--ink)}
+.flow{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;counter-reset:f}
+.flow li{counter-increment:f;background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:14px 14px 15px;display:grid;gap:6px;align-content:start;min-width:0}
+.flow li::before{content:counter(f);font:700 30px/1 var(--f-display);color:var(--red)}
+.flow b{font:700 18px/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.02em}
+.flow span{font-size:14.5px;color:var(--muted)}
+.toc{display:flex;flex-wrap:wrap;gap:6px;margin:22px 0 4px;padding:0;list-style:none}
+.toc a{display:inline-flex;align-items:center;min-height:36px;padding:0 13px;border:1px solid var(--line);border-radius:999px;background:var(--sheet);color:var(--ink);text-decoration:none;font-weight:600;font-size:14.5px}
+.sec{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:28px;align-items:start;padding-block:30px;border-top:1px solid var(--line)}
+.sec:first-of-type{border-top:0}
+.sec.noimg{grid-template-columns:minmax(0,1fr)}
+h2{font:700 28px/1.05 var(--f-display);text-transform:uppercase;letter-spacing:.01em;margin:0 0 10px;text-wrap:balance}
+.txt p{margin:0 0 10px;max-width:62ch}
+.steps{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:10px;max-width:62ch}
+.steps li{display:grid;grid-template-columns:26px minmax(0,1fr);gap:10px;align-items:start}
+.nr{width:24px;height:24px;border-radius:50%;background:var(--mark);color:#fff;display:inline-grid;place-items:center;font:700 14px/1 var(--f-body);margin-top:1px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.dot{width:24px;height:24px;display:grid;place-items:center;color:var(--muted);font-weight:700}
+.tip{margin-top:14px;max-width:62ch;background:var(--info-bg);border-radius:10px;padding:12px 14px;font-size:15px}
+.tip .tt{display:block;font:700 15px/1.2 var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;color:var(--info)}
+.tip p{margin:4px 0 0}
+.legend{display:grid;gap:6px;margin-top:12px;max-width:62ch;font-size:15px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:7px;font-weight:600;font-size:13.5px}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.chip.info{background:var(--info-bg);color:var(--info)}
+.chip.ok{background:var(--green-bg);color:var(--green)}
+.shot{margin:0;display:grid;gap:12px;justify-items:center}
+.shot img{width:100%;max-width:320px;border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 22px rgba(20,25,23,.12);background:#fff}
+.shot figcaption{font-size:13.5px;color:var(--muted);text-align:center;max-width:320px}
+.faq{display:grid;gap:12px;margin:0;max-width:66ch}
+.faq dt{font-weight:700}
+.faq dd{margin:2px 0 0;color:var(--ink)}
+footer{border-top:1px solid var(--line);padding-block:22px 34px;color:var(--muted);font-size:14.5px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+@media (max-width:820px){
+  .flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sec{grid-template-columns:minmax(0,1fr);gap:18px}
+  .shot img{max-width:300px}
+}
+@media (max-width:420px){
+  h1{font-size:34px}
+  .brand small{display:none}
+  .go span{display:none}
+  .go{padding:0 11px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="crest" aria-hidden="true">U11</span><span><b>Handleiding</b><small>Hechtel U11 Planner</small></span></div>
+    <a class="go" href="./"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>Naar de planner</span></a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" aria-labelledby="t">
+    <h1 id="t">Zo werkt de planner</h1>
+    <p class="lead">Hier maak je elke week het schema voor Hechtel A en B: wie er speelt, wie de was en de broodjes doet en wanneer iedereen er moet zijn. De matchen uit de RBFA-kalender staan er al in.</p>
+    <ol class="flow" aria-label="Elke week in vier stappen">
+      <li><b>Open de planner</b><span>Je ziet meteen de eerstvolgende speeldag.</span></li>
+      <li><b>Kijk de selectie na</b><span>Haal wie er niet is eruit met het kruisje.</span></li>
+      <li><b>Bevestig de was</b><span>Neem het voorstel over of kies iemand anders.</span></li>
+      <li><b>Deel het schema</b><span>Exporteer en stuur het naar de WhatsApp-groep.</span></li>
+    </ol>
+    <ul class="toc" aria-label="Onderwerpen">
+      <li><a href="#inloggen">Inloggen</a></li>
+      <li><a href="#speeldag">De speeldag</a></li>
+      <li><a href="#selectie">Selectie</a></li>
+      <li><a href="#was">Was + broodjes</a></li>
+      <li><a href="#verzamelen">Verzamelen</a></li>
+      <li><a href="#status">Afgelast of verplaatst</a></li>
+      <li><a href="#delen">Exporteren en delen</a></li>
+      <li><a href="#vooruit">Vooruit plannen</a></li>
+      <li><a href="#spelers">Spelers</a></li>
+      <li><a href="#extra">Extra match</a></li>
+      <li><a href="#weten">Goed om te weten</a></li>
+    </ul>
+  </section>
+
+  <section class="sec" id="inloggen">
+    <div class="txt">
+      <h2>Inloggen</h2>
+      <p>Je hebt geen wachtwoord nodig. De planner stuurt een link naar je mailbox.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Vul je e-mailadres in.</span></li>
+        <li><span class="nr">2</span><span>Tik op <b>Stuur link</b>. Open de mail van "Hechtel U11 Planner" en tik op de link. Op dat toestel blijf je daarna ingelogd.</span></li>
+        <li><span class="nr">3</span><span>Het vraagteken bovenaan brengt je altijd terug naar deze handleiding.</span></li>
+      </ul>
+      <div class="tip"><span class="tt">Op je beginscherm zetten</span>
+        <p><strong>iPhone:</strong> open de planner in Safari, tik op het deelicoon en kies "Zet op beginscherm".</p>
+        <p><strong>Android:</strong> tik in Chrome op de drie puntjes en kies "Toevoegen aan startscherm".</p>
+      </div>
+      <p style="margin-top:12px">Geen mail gekregen? Kijk bij spam. Krijg je "Nog geen toegang", vraag dan de beheerder om je e-mailadres toe te voegen.</p>
+    </div>
+    <figure class="shot"><img src="hl-01-inloggen.png" width="780" height="952" alt="Inlogscherm met het e-mailadres ingevuld en de knop Stuur link" loading="lazy"></figure>
+  </section>
+
+  <section class="sec" id="speeldag">
+    <div class="txt">
+      <h2>De speeldag</h2>
+      <p>Per match zie je een kaart met de tegenstander, het verzameluur, de selectie en wie de was doet.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>De speeldag van deze week. Met de pijltjes ga je naar de vorige of volgende week.</span></li>
+        <li><span class="nr">2</span><span><b>Exporteer</b> maakt het schema als afbeelding of PDF.</span></li>
+        <li><span class="nr">3</span><span>Het verzameluur. Thuis is dat 09:00 in de kleedkamer. Op verplaatsing is het vertrek aan de parking: aftrap min 1 uur min de rijtijd.</span></li>
+        <li><span class="nr">4</span><span>De status van de match: gepland, geannuleerd of verplaatst.</span></li>
+        <li><span class="nr">5</span><span>Deze handleiding.</span></li>
+      </ul>
+      <div class="legend">
+        <span><span class="chip warn">geel</span> let op, bijvoorbeeld 12 spelers terwijl het doel 10 is</span>
+        <span><span class="chip bad">rood</span> er ontbreekt iets, bijvoorbeeld de rijtijd</span>
+        <span><span class="chip info">blauw</span> de RBFA heeft iets gewijzigd</span>
+      </div>
+    </div>
+    <figure class="shot"><img src="hl-02-speeldag.png" width="780" height="1688" alt="Speeldag 7 met de knop Exporteer en de kaart van de uitmatch van Hechtel A" loading="lazy"></figure>
+  </section>
+
+  <section class="sec" id="selectie">
+    <div class="txt">
+      <h2>Selectie aanpassen</h2>
+      <p>Elke match start met de vaste spelers van de ploeg. Je past alleen aan wat anders is.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Tik op het <b>kruisje</b> om een speler uit de selectie te halen, bijvoorbeeld als hij ziek is.</span></li>
+        <li><span class="nr">2</span><span>Wie niet geselecteerd is, staat eronder. Tik erop om die speler terug te zetten.</span></li>
+        <li><span class="nr">3</span><span><b>Andere speler</b>: iemand van de andere ploeg of een gastspeler laten meespelen.</span></li>
+        <li><span class="nr">4</span><span>Per ongeluk getikt? Tik op <b>Ongedaan maken</b>.</span></li>
+      </ul>
+    </div>
+    <figure class="shot"><img src="hl-03-selectie.png" width="780" height="1688" alt="Selectie met een kruisje per speler, een speler onder Niet geselecteerd en de melding Ongedaan maken" loading="lazy"></figure>
+  </section>
+
+  <section class="sec" id="was">
+    <div class="txt">
+      <h2>Was + broodjes</h2>
+      <p>De planner stelt per match iemand voor: de speler die het dit seizoen het minst deed. Een voorstel herken je aan de stippellijn.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Tik op <b>Bevestig</b> om het voorstel over te nemen.</span></li>
+        <li><span class="nr">2</span><span>Tik op <b>Ander</b> om zelf iemand te kiezen. In de lijst zie je hoe vaak elke speler het dit seizoen al deed.</span></li>
+      </ul>
+      <p style="margin-top:12px">Exporteer je het schema zonder te bevestigen, dan legt de planner het voorstel vast. Wie de was doet, staat in het groen op het schema.</p>
+    </div>
+    <figure class="shot">
+      <img src="hl-04-was.png" width="780" height="516" alt="Vak Was + broodjes met het voorstel en de knoppen Bevestig en Ander" loading="lazy">
+      <img src="hl-05-waskiezer.png" width="780" height="1688" alt="Lijst om te kiezen wie de was doet, met per speler het aantal keer dit seizoen" loading="lazy">
+    </figure>
+  </section>
+
+  <section class="sec" id="verzamelen">
+    <div class="txt">
+      <h2>Verzamelen en notitie</h2>
+      <p>Tik op het verzameluur van een match. Bovenaan zie je hoe het standaarduur berekend is.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Vul een ander uur in als je vroeger of later afspreekt. Ook de plaats kan je aanpassen.</span></li>
+        <li><span class="nr">2</span><span>Een notitie komt mee op het schema, bijvoorbeeld "Witte kousen meebrengen".</span></li>
+        <li><span class="nr">3</span><span>Tik op <b>Opslaan</b>. Met "Standaard herstellen" ga je terug naar het berekende uur.</span></li>
+      </ul>
+    </div>
+    <figure class="shot"><img src="hl-06-verzamelen.png" width="780" height="1688" alt="Venster Verzamelen met het standaarduur, een ander verzameluur, de notitie en Opslaan" loading="lazy"></figure>
+  </section>
+
+  <section class="sec" id="status">
+    <div class="txt">
+      <h2>Afgelast of verplaatst</h2>
+      <p>Tik op de status van de match (standaard "Gepland").</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Kies <b>Geannuleerd</b> of <b>Verplaatst</b>. Een geannuleerde match komt doorstreept op het schema.</span></li>
+        <li><span class="nr">2</span><span>Bij verplaatst vul je de nieuwe datum en het aftrapuur in. De match verhuist mee naar die week.</span></li>
+      </ul>
+      <p style="margin-top:12px">Verplaatst de RBFA een match, dan past de planner dat zelf aan. Je ziet dan een blauwe melding op de kaart.</p>
+    </div>
+    <figure class="shot"><img src="hl-07-status.png" width="780" height="1688" alt="Venster Status met Gepland, Geannuleerd en Verplaatst en de nieuwe datum" loading="lazy"></figure>
+  </section>
+
+  <section class="sec" id="delen">
+    <div class="txt">
+      <h2>Exporteren en delen</h2>
+      <p>Tik op <b>Exporteer</b> bij de speeldag. Je ziet meteen een voorbeeld van het schema.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Vink aan welke matchen op het schema komen.</span></li>
+        <li><span class="nr">2</span><span><b>Delen</b> opent WhatsApp en je andere apps. Kies de groep en verstuur.</span></li>
+        <li><span class="nr">3</span><span>Of download een JPEG of PDF, bijvoorbeeld op de computer.</span></li>
+      </ul>
+      <p style="margin-top:12px">Pas je na het delen nog iets aan, dan meldt de planner <span class="chip warn">Gewijzigd na de export</span>. Deel het schema dan opnieuw.</p>
+    </div>
+    <figure class="shot"><img src="hl-08-exporteren.png" width="780" height="1688" alt="Venster Exporteren met het voorbeeld van het schema en de knoppen Delen, PDF en JPEG" loading="lazy"></figure>
+  </section>
+
+  <section class="sec" id="vooruit">
+    <div class="txt">
+      <h2>Vooruit plannen</h2>
+      <p>In de <b>Kalender</b> staan alle weken onder elkaar, met het verzameluur, wie de was doet en het aantal spelers. Tik op een match om naar die week te gaan.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Vink een of meer speeldagen aan.</span></li>
+        <li><span class="nr">2</span><span>Tik op <b>Exporteer</b>. Je krijgt één afbeelding per speeldag, of één PDF met een pagina per speeldag.</span></li>
+      </ul>
+    </div>
+    <figure class="shot"><img src="hl-09-kalender.png" width="780" height="1688" alt="Kalender met twee speeldagen aangevinkt en de knop Exporteer 2 speeldagen" loading="lazy"></figure>
+  </section>
+
+  <section class="sec" id="spelers">
+    <div class="txt">
+      <h2>Spelers en ploegen</h2>
+      <p>De ploeglijsten zijn het vertrekpunt voor elke nieuwe match.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Kies Hechtel A, Hechtel B of Extern.</span></li>
+        <li><span class="nr">2</span><span>Verhuis een speler naar de andere ploeg.</span></li>
+        <li><span class="nr">3</span><span>Voeg een nieuwe speler toe: voornaam en de eerste letter van de achternaam.</span></li>
+      </ul>
+      <p style="margin-top:12px">Tik op een naam om die te wijzigen of op inactief te zetten, bijvoorbeeld bij een blessure. Het shirtje toont hoe vaak iemand dit seizoen de was deed.</p>
+    </div>
+    <figure class="shot"><img src="hl-10-spelers.png" width="780" height="1688" alt="Spelerslijst van Hechtel A met per speler het aantal keer was en een knop om naar B te verhuizen" loading="lazy"></figure>
+  </section>
+
+  <section class="sec" id="extra">
+    <div class="txt">
+      <h2>Een extra match</h2>
+      <p>Een oefenmatch, tornooi of inhaalmatch die niet in de RBFA-kalender staat, voeg je zelf toe met <b>Match toevoegen</b>, onderaan de speeldag of in de Kalender.</p>
+      <ul class="steps">
+        <li><span class="nr">1</span><span>Kies de tegenstander uit de lijst.</span></li>
+        <li><span class="nr">2</span><span>Staat die er niet in, kies dan "+ Nieuwe tegenstander" en vul naam, terrein, adres en rijtijd in.</span></li>
+      </ul>
+    </div>
+    <figure class="shot"><img src="hl-11-match.png" width="780" height="1688" alt="Venster Match toevoegen met de keuze van de tegenstander en de velden voor een nieuwe tegenstander" loading="lazy"></figure>
+  </section>
+
+  <section class="sec noimg" id="weten">
+    <div class="txt">
+      <h2>Goed om te weten</h2>
+      <dl class="faq">
+        <dt>Moet ik de RBFA-kalender zelf bijhouden?</dt>
+        <dd>Nee. Bij het openen kijkt de planner de RBFA-kalender na. Nieuwe en verplaatste matchen, nieuwe tegenstanders en nieuwe spelers komen er vanzelf in. Je ziet dat aan de blauwe melding "RBFA: wijzigingen verwerkt".</dd>
+        <dt>Zien de andere trainers wat ik aanpas?</dt>
+        <dd>Ja, meteen. Iedereen werkt in dezelfde planning.</dd>
+        <dt>Ik krijg geen inlogmail.</dt>
+        <dd>Kijk bij spam. Er kunnen maximaal 5 inloglinks per dag verstuurd worden, probeer het anders de volgende dag opnieuw. Eenmaal ingelogd hoef je dat op dat toestel niet meer te doen.</dd>
+        <dt>Er staat een nieuwe speler bovenaan bij Spelers.</dt>
+        <dd>Die staat nieuw in de RBFA-spelerslijst. Tik op A, B of Extern om te zeggen bij welke ploeg hij of zij hoort.</dd>
+        <dt>Werkt het ook op de computer?</dt>
+        <dd>Ja, in elke browser. Op een groot scherm staan de matchen naast elkaar.</dd>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Vragen of problemen? Contacteer de beheerder van de planner. De namen op de screenshots zijn voorbeelden.</span>
+    <a class="go" href="./"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>Naar de planner</span></a>
+  </div>
+</footer>
+</body>
+</html>

@@ -32,6 +32,8 @@ Op een iPhone opent de link uit de mail soms in een andere browser dan de app op
 
 ## Gebruik
 
+Voor de trainers is er een korte handleiding met screenshots: `handleiding.html`, ook te openen via het vraagteken bovenaan in de planner en via de link op het inlogscherm. De namen op die screenshots zijn voorbeelden.
+
 - **Speeldag:** de matchen van één week. Tik op een speler om hem uit de selectie te halen, op het shirtje voor was + broodjes, op het verzameluur om het aan te passen. Exporteer als JPEG of PDF, of deel meteen via WhatsApp.
 - **Kalender:** alle weken onder elkaar. Vink meerdere speeldagen aan om ze samen te exporteren.
 - **Spelers:** de ploeglijsten van A en B zijn het sjabloon voor elke nieuwe match. Verhuis spelers tussen A en B, voeg externe spelers toe, zet iemand inactief.
@@ -63,6 +65,7 @@ Meer > Back-up > Back-up downloaden geeft een JSON-bestand met alle gegevens. Me
 - `index.html`, `app.js`, `app.css`: de app, zonder framework.
 - `config.js`: Firebase-instellingen.
 - `firestore.rules`: beveiligingsregels (sjabloon).
+- `handleiding.html` en `hl-*.png`: handleiding voor de trainers, met screenshots uit een testomgeving met fictieve namen.
 - `firebase-*-compat.js` en `jspdf.umd.min.js`: Firebase JS SDK 10.12.2 (compat) en jsPDF 2.5.1, zelf gehost.
 - Collecties in Firestore: `config/main`, `players`, `opponents`, `matches`, `weeks` (titel en exportdatum per week, sleutel = maandag), `members` (sleutel = e-mailadres, `role`: `trainer` of `admin`).
 - RBFA: GraphQL op `datalake-prod2018.rbfa.be` (clubTeams, teamCalendar, matchDetail, teamMembers). Club 1416, stamnummer 02662.
