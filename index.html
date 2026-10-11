@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hechtel U11 Planner</title>
+<meta name="description" content="Wedstrijdschema's voor K. Hechtel FC U11 A en B">
+<meta name="theme-color" content="#141917">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hechtel U11">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap">
+<link rel="stylesheet" href="app.css?v=1">
+</head>
+<body>
+
+
+<div id="app">
+  <header class="top">
+    <div class="top-in wrap">
+      <div class="brand">
+        <span class="crest" aria-hidden="true">U11</span>
+        <span class="bt"><b>Hechtel U11</b><small>Wedstrijdschema's A &amp; B</small></span>
+      </div>
+      <span class="syncinfo" id="syncinfo"></span>
+      <nav class="tabs" aria-label="Onderdelen">
+        <button class="tab" data-a="nav" data-v="week"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M9 3.5v4M15 3.5v4"/></svg><span>Speeldag</span></button>
+        <button class="tab" data-a="nav" data-v="cal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg><span>Kalender</span></button>
+        <button class="tab" data-a="nav" data-v="players"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.5" cy="8" r="3.5"/><path d="M3.5 20v-1.2a4.3 4.3 0 0 1 4.3-4.3h3.4a4.3 4.3 0 0 1 4.3 4.3V20M15.5 4.6a3.5 3.5 0 0 1 0 6.8M20.5 20v-1.2a4.3 4.3 0 0 0-3-4.1"/></svg><span>Spelers</span></button>
+        <button class="tab" data-a="nav" data-v="more"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/></svg><span>Meer</span></button>
+      </nav>
+    </div>
+  </header>
+  <main id="view" class="wrap"><div class="loading"><div class="skel"></div><p>Kalender en spelers laden…</p></div></main>
+  <div id="sheet" class="sheet-wrap" hidden>
+    <div class="scrim" data-a="closeSheet"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Venster"><button class="icon-btn sm x" data-a="closeSheet" aria-label="Sluiten"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div id="sheetBody"></div></div>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+</div>
+<noscript><p style="padding:20px">Zet JavaScript aan om de planner te gebruiken.</p></noscript>
+<script src="firebase-app-compat.js"></script>
+<script src="firebase-auth-compat.js"></script>
+<script src="firebase-firestore-compat.js"></script>
+<script src="config.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

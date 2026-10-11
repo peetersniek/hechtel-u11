@@ -1,0 +1,30 @@
+rules_version = '2';
+// Beveiligingsregels voor de Hechtel U11 Planner.
+// Vervang OWNER_EMAIL door het e-mailadres van de eigenaar (in kleine letters)
+// en plak alles in Firebase > Firestore Database > Regels > Publiceren.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Inloggen gebeurt met een e-maillink; Firebase zet dan email_verified op true.
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+    function mail() { return request.auth.token.email.lower(); }
+    function isOwner() { return signedIn() && mail() == 'OWNER_EMAIL'; }
+    function isMember() {
+      return signedIn() && (isOwner() || exists(/databases/$(database)/documents/members/$(mail())));
+    }
+    function isAdmin() {
+      return isOwner() || (isMember() && get(/databases/$(database)/documents/members/$(mail())).data.role == 'admin');
+    }
+    // Wie toegang heeft: alleen de eigenaar en beheerders passen dit aan.
+    match /members/{email} {
+      allow read: if isMember();
+      allow write: if isAdmin();
+    }
+    // Kalender, spelers, tegenstanders, weken en instellingen: alle leden lezen en schrijven.
+    match /{col}/{id} {
+      allow read, write: if col != 'members' && isMember();
+    }
+  }
+}
