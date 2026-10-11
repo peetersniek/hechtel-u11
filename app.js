@@ -380,7 +380,7 @@ function pump(key){
   })();
 }
 function overlay(col,map){queues.forEach(function(q,key){var i=key.indexOf('/'),c=key.slice(0,i),id=key.slice(i+1);if(c!==col)return;[q.inflight].concat(q.ops).forEach(function(op){if(!op)return;if(op.mode==='delete')map.delete(id);else if(op.mode==='set')map.set(id,Object.assign({id:id},op.data));else map.set(id,merge(map.get(id)||{id:id},op.data));});});return map;}
-var UNSUBS=[];
+var UNSUBS=[],SUBGEN=0;
 function makeDB(fs){
   function wrap(s){return {id:s.id,exists:s.exists,fromCache:!!(s.metadata&&s.metadata.fromCache),data:function(){return s.data();}};}
   function em(e){return {code:(e&&e.code)||'unavailable',message:(e&&e.message)||''};}
@@ -395,19 +395,21 @@ function makeDB(fs){
   };
 }
 function subscribe(){
-  stopSubs();
-  UNSUBS.push(DB.doc('config/main').onSnapshot(function(s){if(!s.exists&&s.fromCache&&!S.loaded.config)return;S.config=s.exists?s.data():null;var q=queues.get('config/main');if(q)[q.inflight].concat(q.ops).forEach(function(op){if(op)S.config=op.mode==='set'?op.data:merge(S.config||{},op.data);});CFG=null;S.loaded.config=true;onData();},subErr));
+  stopSubs();var gen=++SUBGEN,err=function(e){if(gen===SUBGEN)subErr(e);};
+  UNSUBS.push(DB.doc('config/main').onSnapshot(function(s){if(gen!==SUBGEN)return;if(!s.exists&&s.fromCache&&!S.loaded.config)return;S.config=s.exists?s.data():null;var q=queues.get('config/main');if(q)[q.inflight].concat(q.ops).forEach(function(op){if(op)S.config=op.mode==='set'?op.data:merge(S.config||{},op.data);});CFG=null;S.loaded.config=true;onData();},err));
   ['players','opponents','matches','weeks','members'].forEach(function(col){
-    UNSUBS.push(DB.collection(col).onSnapshot(function(snap){var m=new Map();snap.docs.forEach(function(d){if(d.exists)m.set(d.id,Object.assign({id:d.id},d.data()));});S[col]=overlay(col,m);S.loaded[col]=true;onData();},subErr));
+    UNSUBS.push(DB.collection(col).onSnapshot(function(snap){if(gen!==SUBGEN)return;var m=new Map();snap.docs.forEach(function(d){if(d.exists)m.set(d.id,Object.assign({id:d.id},d.data()));});S[col]=overlay(col,m);S.loaded[col]=true;onData();},err));
   });
 }
-function stopSubs(){UNSUBS.forEach(function(u){try{u();}catch(e){}});UNSUBS=[];S.loaded={};}
-function subErr(e){if(e&&e.code==='permission-denied'){S.db='denied';stopSubs();render();return;}toast('Verbinding met de gegevens verbroken. Herlaad de pagina.');}
+function stopSubs(){SUBGEN++;UNSUBS.forEach(function(u){try{u();}catch(e){}});UNSUBS=[];S.loaded={};}
+function subErr(e){if(e&&e.code==='permission-denied'){stopSubs();
+    if(!S.retried&&S.user){S.retried=true;var u=AUTH&&AUTH.currentUser;setTimeout(function(){if(!S.user)return;(u?u.getIdToken(true):Promise.resolve()).then(subscribe,subscribe);},1500);return;}
+    S.db='denied';render();return;}toast('Verbinding met de gegevens verbroken. Herlaad de pagina.');}
 function onData(){
   if(S.db==='denied')return;
   if(['config','players','opponents','matches','weeks','members'].every(function(k){return S.loaded[k];})){
     var me=S.user&&S.members.get(S.user.email);S.owner=!!(S.user&&!me);S.admin=!!(S.user&&(S.owner||me.role==='admin'));
-    if(S.db!=='ready'){S.db='ready';setTimeout(function(){syncRbfa(false);},600);}
+    S.retried=false;if(S.db!=='ready'){S.db='ready';setTimeout(function(){syncRbfa(false);},600);}
     if(!S.week&&S.matches.size)S.week=defaultWeek();
   }
   render();
@@ -938,7 +940,7 @@ var ACT={
   syncNow:function(){syncRbfa(true);},
   changesOpen:function(){openSheet('changes');},
   signOut:function(){if(S.sheet)closeSheet();AUTH.signOut().then(function(){S.login=null;});},
-  retryAccess:function(){S.db='wait';render();subscribe();},
+  retryAccess:function(){S.db='wait';S.retried=false;render();var u=AUTH&&AUTH.currentUser;(u?u.getIdToken(true):Promise.resolve()).then(subscribe,subscribe);},
   loginAgain:function(){S.login={};render();},
   startEmpty:function(){write('config','main','set',merge(DEFAULT_CONFIG,{createdAt:new Date().toISOString()}));setTimeout(function(){syncRbfa(true);},800);},
   backup:function(){var out={app:'hechtel-u11-backup',v:1,exportedAt:new Date().toISOString(),collections:{config:{main:S.config||{}},players:{},opponents:{},matches:{},weeks:{}}};
@@ -989,12 +991,13 @@ function boot(){
   AUTH=firebase.auth();FS=firebase.firestore();
   try{AUTH.languageCode='nl';}catch(e){}
   try{FS.settings({ignoreUndefinedProperties:true,merge:true});}catch(e){}
-  FS.enablePersistence({synchronizeTabs:true}).catch(function(){});
+  FS.enablePersistence().catch(function(){});
   DB=makeDB(FS);
   if(AUTH.isSignInWithEmailLink(location.href)){var em='';try{em=localStorage.getItem('hu11.email')||'';}catch(e){}finishLink(em,location.href);}
   AUTH.onAuthStateChanged(function(u){
     if(!u){S.user=null;S.admin=false;S.owner=false;S.week=null;stopSubs();S.config=null;CFG=null;['players','opponents','matches','weeks','members'].forEach(function(c){S[c]=new Map();});S.db='login';render();return;}
-    S.user={uid:u.uid,email:String(u.email||'').toLowerCase()};S.admin=false;S.owner=false;S.db='wait';render();subscribe();
+    S.user={uid:u.uid,email:String(u.email||'').toLowerCase()};S.admin=false;S.owner=false;S.retried=false;S.db='wait';render();
+    u.getIdToken().then(subscribe,subscribe);
     if(/[?&](oobCode|apiKey)=/.test(location.search))history.replaceState(null,'',location.pathname);
   });
   document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')syncRbfa(false);});
