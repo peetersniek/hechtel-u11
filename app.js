@@ -148,7 +148,11 @@ function computeSugg(){
   });
   S.sugg=out;
 }
-function wasStats(){var st=new Map(),ss=seasonStart(today());allMatches().forEach(function(m){if(!m.wasId||m.status==='geannuleerd')return;var d=eff(m).date;if(d<ss)return;var s=st.get(m.wasId)||{n:0,last:''};s.n++;if(d>s.last)s.last=d;st.set(m.wasId,s);});return st;}
+/* counters only count matches that were played; assigned turns for later matches are shown as a dashed +1 */
+function played(m){var e=eff(m),t=today();return e.date<t||(e.date===t&&!!e.time&&e.time<=nowHM());}
+function planTag(n){return n?'<small class="pln">+'+n+'</small>':'';}
+function wasStats(){var st=new Map(),ss=seasonStart(today());allMatches().forEach(function(m){if(!m.wasId||m.status==='geannuleerd')return;var d=eff(m).date;if(d<ss)return;var s=st.get(m.wasId)||{n:0,last:'',plan:[]};if(played(m)){s.n++;if(d>s.last)s.last=d;}else s.plan.push(d);st.set(m.wasId,s);});st.forEach(function(s){s.plan.sort();});return st;}
+function wasTitle(s){return 'Was + broodjes: '+(s&&s.n?s.n+' keer gedaan, laatst '+dShort(s.last):'nog niet gedaan')+(s&&s.plan.length?'. Gepland: '+s.plan.map(dShort).join(', '):'');}
 function wasOf(m){var sel=selection(m);return (m.wasId&&sel.indexOf(m.wasId)>=0)?m.wasId:null;}
 /* playing with the other team: a counter per child and per team, this season. A match counts with the real
    attendance from the substitution tool when that was used, otherwise with the planned selection. */
@@ -156,12 +160,13 @@ function teamAt(p,d){return (p.movedAt&&p.prevTeam&&d<p.movedAt)?p.prevTeam:p.te
 function squadOf(m){var g=gameOf(m.id);if(g&&gState(g)!=='pre'&&Array.isArray(g.present)){var ids=g.present.slice();(g.ev||[]).forEach(function(e){if(e.k==='add'&&ids.indexOf(e.id)<0)ids.push(e.id);});return ids;}return selection(m);}
 function guestStats(){var st=new Map(),ss=seasonStart(today());
   allMatches().forEach(function(m){if(m.status==='geannuleerd'||(m.team!=='A'&&m.team!=='B'))return;var d=eff(m).date;if(d<ss)return;
-    squadOf(m).forEach(function(id){var p=S.players.get(id);if(!p)return;var t=teamAt(p,d);if((t!=='A'&&t!=='B')||t===m.team)return;var s=st.get(id)||{n:0,dates:[],at:{A:0,B:0}};s.n++;s.at[m.team]++;s.dates.push(d);st.set(id,s);});});
-  st.forEach(function(s){s.dates.sort();});return st;}
+    squadOf(m).forEach(function(id){var p=S.players.get(id);if(!p)return;var t=teamAt(p,d);if((t!=='A'&&t!=='B')||t===m.team)return;var s=st.get(id)||{n:0,dates:[],at:{A:0,B:0},plan:[],pat:{A:0,B:0}};if(played(m)){s.n++;s.at[m.team]++;s.dates.push(d);}else{s.plan.push(d);s.pat[m.team]++;}st.set(id,s);});});
+  st.forEach(function(s){s.dates.sort();s.plan.sort();});return st;}
 function moveP(p,to){var x={team:to};if((p.team==='A'||p.team==='B')&&(to==='A'||to==='B')&&p.team!==to){x.prevTeam=p.team;x.movedAt=today();}return x;}
-function guestTxt(s){return s.n+'× bij '+(s.at.A&&s.at.B?'A en B':s.at.A?'A':'B');}
-function guestChip(gs,id){var s=gs.get(id);return s?'<small class="gxc">'+s.n+'×</small>':'';}
-function guestHint(gs,arr){return arr.some(function(p){return gs.has(p.id);})?'<p class="hint">Het getal is hoe vaak die speler dit seizoen al meespeelde met de andere ploeg.</p>':'';}
+function guestTxt(s){var a=s.n?s.at:s.pat;return (s.n?s.n+'× ':'')+'bij '+(a.A&&a.B?'A en B':a.A?'A':'B');}
+function guestTitle(s){return 'Meegespeeld met de andere ploeg: '+(s.n?s.dates.map(dShort).join(', '):'nog niet')+(s.plan.length?'. Gepland: '+s.plan.map(dShort).join(', '):'');}
+function guestChip(gs,id){var s=gs.get(id);return s?'<small class="gxc">'+(s.n?s.n+'×':'')+(s.plan.length?(s.n?' ':'')+'+'+s.plan.length:'')+'</small>':'';}
+function guestHint(gs,arr){return arr.some(function(p){return gs.has(p.id);})?'<p class="hint">Het getal is hoe vaak die speler dit seizoen al meespeelde met de andere ploeg. +1 staat al ingepland en telt mee zodra die match gespeeld is.</p>':'';}
 
 function flags(m){
   var out=[];if(m.status==='geannuleerd')return out;
@@ -575,12 +580,12 @@ function calCell(m){
 
 /* ---------- Spelers ---------- */
 function viewPlayers(){
-  var st=wasStats(),gs=guestStats(),groups={A:[],B:[],X:[]},review=[],out={A:0,B:0};
+  var st=wasStats(),gs=guestStats(),groups={A:[],B:[],X:[]},review=[],out={A:0,B:0},pout={A:0,B:0};
   plist().forEach(function(p){if(p.review){review.push(p);return;}(groups[p.team]||groups.X).push(p);});
-  gs.forEach(function(s){out.A+=s.at.B;out.B+=s.at.A;});
+  gs.forEach(function(s){out.A+=s.at.B;out.B+=s.at.A;pout.A+=s.pat.B;pout.B+=s.pat.A;});
   Object.keys(groups).forEach(function(k){groups[k].sort(function(a,b){return ((a.active===false)-(b.active===false))||byOrder(a,b);});});
   function col(k,title){var act=groups[k].filter(function(p){return p.active!==false;}).length,o=k==='A'?'B':'A';
-    var tot=k==='X'?'':'<span class="gxt" title="Zo vaak speelde dit seizoen een speler van '+esc(teamLabel(k))+' mee bij '+esc(teamLabel(o))+'">'+out[k]+'× bij '+esc(o)+'</span>';
+    var tot=k==='X'?'':'<span class="gxt" title="Zo vaak speelde dit seizoen een speler van '+esc(teamLabel(k))+' mee bij '+esc(teamLabel(o))+'">'+out[k]+'× bij '+esc(o)+planTag(pout[k])+'</span>';
     return '<section class="panel pcol'+(S.ptab===k?' on':'')+'"><div class="ph"><h2>'+esc(title)+' <span class="cnt">'+act+'</span></h2>'+tot+'</div>'+(groups[k].map(function(p){return prow(p,st,gs);}).join('')||'<p class="hint">Nog geen spelers.</p>')+'</section>';}
   var h='<section class="ptop"><h1>Spelers</h1>'+
     '<form class="padd" data-form="addPlayer"><input type="text" id="np-name" placeholder="Nieuwe speler, bv. Tibo V" autocomplete="off" aria-label="Naam nieuwe speler"><select id="np-team" aria-label="Ploeg"><option value="A">'+esc(teamLabel('A'))+'</option><option value="B">'+esc(teamLabel('B'))+'</option><option value="X">Extern</option></select><button class="btn primary" type="submit">'+ic('plus')+'Toevoegen</button></form></section>';
@@ -589,13 +594,13 @@ function viewPlayers(){
   if(gone.length)h+='<div class="review"><div class="rrow"><span>'+ic('info')+'<span>Nieuw seizoen: <b>'+esc(gone.map(pName).join(', '))+'</b> '+(gone.length>1?'staan':'staat')+' niet bij '+esc(sn.teams.A)+' of '+esc(sn.teams.B)+' in RBFA. Inactief zetten? De historiek blijft bewaard.</span></span><span class="ract"><button class="btn sm" data-a="goneOff">Inactief zetten</button><button class="btn sm ghost" data-a="goneKeep">Laten staan</button></span></div></div>';
   h+='<div class="seg mob" style="margin-bottom:12px">'+['A','B','X'].map(function(k){return '<button data-a="ptab" data-k="'+k+'" aria-pressed="'+(S.ptab===k)+'">'+(k==='X'?'Extern':esc(teamLabel(k)))+' ('+groups[k].filter(function(p){return p.active!==false;}).length+')</button>';}).join('')+'</div>';
   h+='<div class="pcols">'+col('A',teamLabel('A'))+col('B',teamLabel('B'))+col('X','Extern / reserve')+'</div>';
-  h+='<p class="hint">De ploeglijst is het sjabloon: elke nieuwe match start met deze spelers. Per match schrap je afwezigen of voeg je iemand van de andere ploeg toe. Het shirtje toont hoe vaak iemand dit seizoen de was en de broodjes deed. "2× bij B" betekent: dit seizoen 2 keer meegespeeld met de andere ploeg; bovenaan staat het totaal per ploeg.</p>';
+  h+='<p class="hint">De ploeglijst is het sjabloon: elke nieuwe match start met deze spelers. Per match schrap je afwezigen of voeg je iemand van de andere ploeg toe. Het shirtje toont hoe vaak iemand dit seizoen de was en de broodjes deed, "2× bij B" hoe vaak hij met de andere ploeg meespeelde (bovenaan het totaal per ploeg). Een gestippelde +1 staat al ingepland en telt mee zodra de match gespeeld is.</p>';
   return h;
 }
 function prow(p,st,gs){var s=st.get(p.id),g=gs&&gs.get(p.id),other=p.team==='A'?'B':'A';
   return '<div class="prow'+(p.active===false?' inactive':'')+'"><button class="pn" data-a="pEdit" data-p="'+esc(p.id)+'">'+esc(p.name)+(p.active===false?' <small>inactief</small>':'')+'</button>'+
-  (g?'<span class="ogx" title="Dit seizoen meegespeeld met de andere ploeg: '+esc(g.dates.map(dShort).join(', '))+'">'+esc(guestTxt(g))+'</span>':'')+
-  '<span class="wc'+(s?'':' zero')+'" title="Was + broodjes'+(s?', laatst '+esc(dShort(s.last)):'')+'">'+ic('shirt')+(s?s.n:0)+'</span>'+
+  (g?'<span class="ogx" title="'+esc(guestTitle(g))+'">'+esc(guestTxt(g))+planTag(g.plan.length)+'</span>':'')+
+  '<span class="wc'+(s?'':' zero')+'" title="'+esc(wasTitle(s))+'"><span class="wn'+(s&&s.n?'':' z')+'">'+ic('shirt')+(s?s.n:0)+'</span>'+planTag(s?s.plan.length:0)+'</span>'+
   (p.team!=='X'?'<button class="btn sm ghost" data-a="pMove" data-p="'+esc(p.id)+'" data-to="'+other+'" title="Verhuis naar '+esc(teamLabel(other))+'">'+ic('swap')+other+'</button>':'<button class="btn sm ghost" data-a="pEdit" data-p="'+esc(p.id)+'">'+ic('edit')+'</button>')+'</div>';}
 
 /* ---------- Meer ---------- */
@@ -705,8 +710,8 @@ var SHEETS={
       '<h3>Nieuwe speler</h3><div class="row"><input type="text" id="ap-name" placeholder="Voornaam + initiaal" autocomplete="off" aria-label="Naam"><select id="ap-team" aria-label="Soort speler" style="max-width:48%"><option value="X">Extern (gastspeler)</option><option value="'+m.team+'">Vaste speler '+esc(teamLabel(m.team))+'</option><option value="'+ot+'">Vaste speler '+esc(teamLabel(ot))+'</option></select></div>'+
       acts('','<button class="btn ghost" data-a="closeSheet">Klaar</button><button class="btn primary" data-a="apNew">'+ic('plus')+'Toevoegen aan match</button>');},
   wasPick:function(sh){var m=getM(sh.id);if(!m)return '';var sel=selection(m),st=wasStats(),cur=wasOf(m),sug=cur?null:S.sugg.get(m.id),mid=esc(m.id);
-    return '<h2>Was + broodjes</h2><p class="sub">'+esc(matchTitle(m))+'</p><p class="hint">Tik op wie de was en de broodjes doet. Het getal is hoe vaak die speler het dit seizoen al deed.</p>'+
-      '<div class="wpick">'+sel.map(function(id){var s=st.get(id);return '<button class="wp'+(id===cur?' on':'')+(id===sug?' sg':'')+'" data-a="wasSet" data-id="'+mid+'" data-p="'+esc(id)+'">'+ic('shirt')+'<span>'+esc(pName(id))+'</span><small>'+(s?s.n:0)+'×</small></button>';}).join('')+'</div>'+
+    return '<h2>Was + broodjes</h2><p class="sub">'+esc(matchTitle(m))+'</p><p class="hint">Tik op wie de was en de broodjes doet. Het getal is hoe vaak die speler het dit seizoen al deed; +1 staat al ingepland voor een match die nog moet komen.</p>'+
+      '<div class="wpick">'+sel.map(function(id){var s=st.get(id);return '<button class="wp'+(id===cur?' on':'')+(id===sug?' sg':'')+'" data-a="wasSet" data-id="'+mid+'" data-p="'+esc(id)+'">'+ic('shirt')+'<span>'+esc(pName(id))+'</span><small>'+(s?s.n:0)+'×</small>'+planTag(s?s.plan.length:0)+'</button>';}).join('')+'</div>'+
       acts(cur?'<button class="btn ghost spacer" data-a="wasSet" data-id="'+mid+'" data-p="">Niemand</button>':'','<button class="btn ghost" data-a="closeSheet">Annuleer</button>');},
   mmenu:function(sh){var m=getM(sh.id);if(!m)return '';var id=esc(m.id);
     return '<h2>Match</h2><p class="sub">'+esc(matchTitle(m))+'</p><div class="menu">'+
@@ -735,8 +740,8 @@ var SHEETS={
     return '<h2>'+(sh.id?esc(o.name||'Tegenstander'):'Nieuwe tegenstander')+'</h2><p class="sub">'+(o.source==='rbfa'?'Uit de RBFA-kalender':'Zelf toegevoegd')+(n?' · '+n+' match'+(n>1?'en':''):'')+'</p>'+oppFields(o)+
       acts((sh.id&&!n)?'<button class="btn ghost danger spacer" data-a="delOpp" data-confirm="Tik nogmaals om te verwijderen">'+ic('trash')+'Verwijderen</button>':'','<button class="btn ghost" data-a="closeSheet">Annuleer</button><button class="btn primary" data-a="saveOpp">Opslaan</button>');},
   player:function(sh){var p=S.players.get(sh.id);if(!p)return '';var st=wasStats().get(p.id),gx=guestStats().get(p.id),team=sh.team||p.team;
-    return '<h2>'+esc(p.name)+'</h2><p class="sub">'+(st?'Was + broodjes dit seizoen: '+st.n+' keer, laatst '+esc(dShort(st.last)):'Dit seizoen nog geen was + broodjes gedaan')+
-      (p.team==='A'||p.team==='B'?'<br>'+(gx?'Meegespeeld met de andere ploeg: '+gx.n+' keer ('+esc(gx.dates.map(dShort).join(', '))+')':'Dit seizoen nog niet meegespeeld met de andere ploeg'):'')+'</p>'+
+    return '<h2>'+esc(p.name)+'</h2><p class="sub">'+(st&&st.n?'Was + broodjes dit seizoen: '+st.n+' keer, laatst '+esc(dShort(st.last)):'Dit seizoen nog geen was + broodjes gedaan')+(st&&st.plan.length?', gepland: '+esc(st.plan.map(dShort).join(', ')):'')+
+      (p.team==='A'||p.team==='B'?'<br>'+(gx&&gx.n?'Meegespeeld met de andere ploeg: '+gx.n+' keer ('+esc(gx.dates.map(dShort).join(', '))+')':'Dit seizoen nog niet meegespeeld met de andere ploeg')+(gx&&gx.plan.length?', gepland: '+esc(gx.plan.map(dShort).join(', ')):''):'')+'</p>'+
       '<label class="fld"><span>Naam op het schema</span><input type="text" id="pl-name" value="'+esc(p.name)+'" autocomplete="off"></label>'+
       '<div class="fld"><span>Vaste ploeg</span><div class="seg">'+['A','B','X'].map(function(t){return '<button data-a="plTeam" data-v="'+t+'" aria-pressed="'+(team===t)+'">'+(t==='X'?'Extern':esc(teamLabel(t)))+'</button>';}).join('')+'</div></div>'+
       '<div class="row2"><label class="fld"><span>Plaats in de lijst</span><input type="number" inputmode="numeric" id="pl-order" value="'+esc(p.order==null?'':p.order)+'"></label><label class="chk" style="align-self:center;margin-top:14px"><input type="checkbox" id="pl-active"'+(p.active!==false?' checked':'')+'> Actief</label></div>'+

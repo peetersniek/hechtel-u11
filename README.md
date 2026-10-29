@@ -36,7 +36,7 @@ Voor de trainers is er een korte handleiding met screenshots: `handleiding.html`
 
 - **Speeldag:** de matchen van één week. Tik op een speler om hem uit de selectie te halen, op het shirtje voor was + broodjes, op het verzameluur om het aan te passen. Exporteer als JPEG of PDF, of deel meteen via WhatsApp.
 - **Kalender:** alle weken onder elkaar. Vink meerdere speeldagen aan om ze samen te exporteren.
-- **Spelers:** de ploeglijsten van A en B zijn het sjabloon voor elke nieuwe match. Verhuis spelers tussen A en B, voeg externe spelers toe, zet iemand inactief. Een blauw label ("2× bij B") toont hoe vaak een speler dit seizoen met de andere ploeg meespeelde, met bovenaan het totaal per ploeg.
+- **Spelers:** de ploeglijsten van A en B zijn het sjabloon voor elke nieuwe match. Verhuis spelers tussen A en B, voeg externe spelers toe, zet iemand inactief. Een blauw label ("2× bij B") toont hoe vaak een speler dit seizoen met de andere ploeg meespeelde, met bovenaan het totaal per ploeg. Beide tellers (ook het shirtje van was + broodjes) tellen alleen gespeelde matchen; wat al ingepland staat, verschijnt als een gestippelde +1.
 - **Wissels:** de knop op de matchkaart opent de wisseltool: wie is er, basisopstelling, en tijdens de match per speler de speelminuten en hoe vaak hij op de bank zat, met een voorstel voor de eerlijkste volgende wissel. Uitleg met screenshots: `wissels.html`. De eigenaar zet de knop aan voor alle trainers bij Meer > Wissels tijdens de match.
 - **Meer:** tegenstanders en rijtijden, verzamelregels, trainers, speeldagnummering, RBFA-ploegen, toegang en back-up.
 
