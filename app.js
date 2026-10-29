@@ -16,7 +16,8 @@ var DEFAULT_CONFIG={
   squad:{target:10,min:8},
   phases:[],
   legend:'GROEN = BROODJES + WAS',
-  rbfa:{clubId:'1416',clubNr:'02662',teamNames:{A:'U11 A',B:'U11 B'}}
+  rbfa:{clubId:'1416',clubNr:'02662',teamNames:{A:'U11 A',B:'U11 B'}},
+  live:{all:false}
 };
 var ICONS={
   chevL:'<path d="M15 18l-6-6 6-6"/>',
@@ -40,6 +41,8 @@ var ICONS={
   spin:'<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/>',
   share:'<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/>',
   x:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  play:'<path d="M8 5.5v13l10.5-6.5z"/>',
+  stop:'<rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>',
   help:'<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7M12 17h.01"/>'
 };
 function ic(n){return '<svg class="i i-'+n+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[n]||'')+'</svg>';}
@@ -73,7 +76,7 @@ function stamp(){var n=new Date();return DSH[n.getDay()]+' '+pad(n.getDate())+'/
 function isoStamp(s){if(!s)return '';var d=new Date(s);if(isNaN(d))return '';return DSH[d.getDay()]+' '+pad(d.getDate())+'/'+pad(d.getMonth()+1)+' '+pad(d.getHours())+':'+pad(d.getMinutes());}
 
 /* ================= state ================= */
-var S={config:null,players:new Map(),opponents:new Map(),matches:new Map(),weeks:new Map(),members:new Map(),user:null,admin:false,owner:false,login:null,sync:{busy:false,err:null},loaded:{},db:'wait',canWrite:true,view:'week',week:null,showPast:false,calSel:new Set(),ptab:'A',sheet:null,sugg:new Map(),undo:null};
+var S={config:null,players:new Map(),opponents:new Map(),matches:new Map(),weeks:new Map(),members:new Map(),games:new Map(),liveId:null,lvSel:null,lvStep:null,prevView:null,user:null,admin:false,owner:false,login:null,sync:{busy:false,err:null},loaded:{},db:'wait',canWrite:true,view:'week',week:null,showPast:false,calSel:new Set(),ptab:'A',sheet:null,sugg:new Map(),undo:null};
 var DB=null,CFG=null;
 try{var lv=localStorage.getItem('hu11.view');if(lv&&['week','cal','players','more'].indexOf(lv)>=0)S.view=lv;var lp=localStorage.getItem('hu11.past');if(lp==='1')S.showPast=true;}catch(e){}
 function cfg(){return CFG||(CFG=merge(DEFAULT_CONFIG,S.config||{}));}
@@ -147,6 +150,18 @@ function computeSugg(){
 }
 function wasStats(){var st=new Map(),ss=seasonStart(today());allMatches().forEach(function(m){if(!m.wasId||m.status==='geannuleerd')return;var d=eff(m).date;if(d<ss)return;var s=st.get(m.wasId)||{n:0,last:''};s.n++;if(d>s.last)s.last=d;st.set(m.wasId,s);});return st;}
 function wasOf(m){var sel=selection(m);return (m.wasId&&sel.indexOf(m.wasId)>=0)?m.wasId:null;}
+/* playing with the other team: a counter per child and per team, this season. A match counts with the real
+   attendance from the substitution tool when that was used, otherwise with the planned selection. */
+function teamAt(p,d){return (p.movedAt&&p.prevTeam&&d<p.movedAt)?p.prevTeam:p.team;}
+function squadOf(m){var g=gameOf(m.id);if(g&&gState(g)!=='pre'&&Array.isArray(g.present)){var ids=g.present.slice();(g.ev||[]).forEach(function(e){if(e.k==='add'&&ids.indexOf(e.id)<0)ids.push(e.id);});return ids;}return selection(m);}
+function guestStats(){var st=new Map(),ss=seasonStart(today());
+  allMatches().forEach(function(m){if(m.status==='geannuleerd'||(m.team!=='A'&&m.team!=='B'))return;var d=eff(m).date;if(d<ss)return;
+    squadOf(m).forEach(function(id){var p=S.players.get(id);if(!p)return;var t=teamAt(p,d);if((t!=='A'&&t!=='B')||t===m.team)return;var s=st.get(id)||{n:0,dates:[],at:{A:0,B:0}};s.n++;s.at[m.team]++;s.dates.push(d);st.set(id,s);});});
+  st.forEach(function(s){s.dates.sort();});return st;}
+function moveP(p,to){var x={team:to};if((p.team==='A'||p.team==='B')&&(to==='A'||to==='B')&&p.team!==to){x.prevTeam=p.team;x.movedAt=today();}return x;}
+function guestTxt(s){return s.n+'× bij '+(s.at.A&&s.at.B?'A en B':s.at.A?'A':'B');}
+function guestChip(gs,id){var s=gs.get(id);return s?'<small class="gxc">'+s.n+'×</small>':'';}
+function guestHint(gs,arr){return arr.some(function(p){return gs.has(p.id);})?'<p class="hint">Het getal is hoe vaak die speler dit seizoen al meespeelde met de andere ploeg.</p>':'';}
 
 function flags(m){
   var out=[];if(m.status==='geannuleerd')return out;
@@ -381,7 +396,9 @@ function pump(key){
     })();
   })();
 }
-function overlay(col,map){queues.forEach(function(q,key){var i=key.indexOf('/'),c=key.slice(0,i),id=key.slice(i+1);if(c!==col)return;[q.inflight].concat(q.ops).forEach(function(op){if(!op)return;if(op.mode==='delete')map.delete(id);else if(op.mode==='set')map.set(id,Object.assign({id:id},op.data));else map.set(id,merge(map.get(id)||{id:id},op.data));});});return map;}
+function overlay(col,map){queues.forEach(function(q,key){var i=key.indexOf('/'),c=key.slice(0,i),id=key.slice(i+1);if(c!==col)return;[q.inflight].concat(q.ops).forEach(function(op){if(!op)return;if(op.mode==='delete')map.delete(id);else if(op.mode==='set')map.set(id,Object.assign({id:id},op.data));else map.set(id,merge(map.get(id)||{id:id},op.data));});});
+  if(col==='games')GPEND.forEach(function(ops,id){ops.forEach(function(op){if(op.mode==='delete')map.delete(id);else map.set(id,merge(map.get(id)||{id:id},op.data));});});
+  return map;}
 var UNSUBS=[],SUBGEN=0;
 function makeDB(fs){
   function wrap(s){return {id:s.id,exists:s.exists,fromCache:!!(s.metadata&&s.metadata.fromCache),data:function(){return s.data();}};}
@@ -399,7 +416,7 @@ function makeDB(fs){
 function subscribe(){
   stopSubs();var gen=++SUBGEN,err=function(e){if(gen===SUBGEN)subErr(e);};
   UNSUBS.push(DB.doc('config/main').onSnapshot(function(s){if(gen!==SUBGEN)return;if(!s.exists&&s.fromCache&&!S.loaded.config)return;S.config=s.exists?s.data():null;var q=queues.get('config/main');if(q)[q.inflight].concat(q.ops).forEach(function(op){if(op)S.config=op.mode==='set'?op.data:merge(S.config||{},op.data);});CFG=null;S.loaded.config=true;onData();},err));
-  ['players','opponents','matches','weeks','members'].forEach(function(col){
+  ['players','opponents','matches','weeks','members','games'].forEach(function(col){
     UNSUBS.push(DB.collection(col).onSnapshot(function(snap){if(gen!==SUBGEN)return;var m=new Map();snap.docs.forEach(function(d){if(d.exists)m.set(d.id,Object.assign({id:d.id},d.data()));});S[col]=overlay(col,m);S.loaded[col]=true;onData();},err));
   });
 }
@@ -409,10 +426,11 @@ function subErr(e){if(e&&e.code==='permission-denied'){stopSubs();
     S.db='denied';render();return;}toast('Verbinding met de gegevens verbroken. Herlaad de pagina.');}
 function onData(){
   if(S.db==='denied')return;
-  if(['config','players','opponents','matches','weeks','members'].every(function(k){return S.loaded[k];})){
+  if(['config','players','opponents','matches','weeks','members','games'].every(function(k){return S.loaded[k];})){
     var me=S.user&&S.members.get(S.user.email);S.owner=!!(S.user&&!me);S.admin=!!(S.user&&(S.owner||me.role==='admin'));
     S.retried=false;if(S.db!=='ready'){S.db='ready';setTimeout(function(){syncRbfa(false);},600);}
     if(!S.week&&S.matches.size)S.week=defaultWeek();
+    if(!S.hashChecked){S.hashChecked=true;var hid=lvHashId();if(hid&&S.matches.has(hid)&&liveOn()){S.prevView=S.view;S.view='live';S.liveId=hid;}}
   }
   render();
 }
@@ -425,7 +443,7 @@ document.addEventListener('focusout',function(){if(deferred){deferred=false;setT
 
 function doRender(){
   CFG=null;
-  var app=$('#app');app.classList.toggle('locked',S.db!=='ready'||!S.config);
+  var app=$('#app');app.classList.toggle('locked',S.db!=='ready'||!S.config);app.classList.toggle('lvmode',S.view==='live'&&S.db==='ready'&&!!S.config);
   document.querySelectorAll('.tab').forEach(function(t){if(t.dataset.v===S.view)t.setAttribute('aria-current','page');else t.removeAttribute('aria-current');});
   var si=$('#syncinfo'),c=cfg(),ls=c.rbfa&&c.rbfa.lastSync;si.textContent=(S.db!=='ready'||!S.config)?'':(S.sync.busy?'RBFA nakijken…':(ls?'RBFA nagekeken '+isoStamp(ls):''));
   var v=$('#view');
@@ -436,8 +454,9 @@ function doRender(){
   if(!S.config){v.innerHTML=viewOnboard();return;}
   computeSugg();
   var html='';
-  if(S.view==='week')html+=viewWeek();else if(S.view==='cal')html+=viewCal();else if(S.view==='players')html+=viewPlayers();else html+=viewMore();
+  if(S.view==='week')html+=viewWeek();else if(S.view==='cal')html+=viewCal();else if(S.view==='players')html+=viewPlayers();else if(S.view==='live')html+=viewLive();else html+=viewMore();
   v.innerHTML=html;
+  lvAfter();
   if(S.view==='more'&&!CLUBTEAMS&&!S.teamsLoading){S.teamsLoading=true;clubTeams().then(function(){S.teamsLoading=false;render();},function(){S.teamsLoading=false;});}
 }
 function gate(title,body){return '<div class="gate"><span class="crest big" aria-hidden="true">U11</span><h1>'+esc(title)+'</h1>'+body+'</div>';}
@@ -516,7 +535,7 @@ function cardHTML(m){
     if(wid)wb='<div class="wasbox set">'+ic('shirt')+'<span class="wt"><small>Was + broodjes</small><b>'+esc(pName(wid))+'</b></span><span class="wbtn"><button class="btn sm" data-a="wasPick" data-id="'+mid+'">Wijzig</button></span></div>';
     else if(sug)wb='<div class="wasbox sugg">'+ic('shirt')+'<span class="wt"><small>Was + broodjes: voorstel</small><b>'+esc(pName(sug))+'</b></span><span class="wbtn"><button class="btn sm ok" data-a="wasOk" data-id="'+mid+'" data-p="'+esc(sug)+'">'+ic('check')+'Bevestig</button><button class="btn sm" data-a="wasPick" data-id="'+mid+'">Ander</button></span></div>';
     else wb='<div class="wasbox none">'+ic('shirt')+'<span class="wt"><small>Was + broodjes</small><b>'+(past?'niet ingevuld':'nog niemand')+'</b></span><span class="wbtn"><button class="btn sm" data-a="wasPick" data-id="'+mid+'">Kies</button></span></div>';
-    h+='<div class="mfoot">'+wb+'<button class="trainers" data-a="trainers" data-id="'+mid+'">Trainers: <b>'+esc(m.trainers||teamTrainers(m.team)||'niet ingevuld')+'</b>'+ic('edit')+'</button></div>';
+    h+='<div class="mfoot">'+wb+'<div class="mfrow"><button class="trainers" data-a="trainers" data-id="'+mid+'">Trainers: <b>'+esc(m.trainers||teamTrainers(m.team)||'niet ingevuld')+'</b>'+ic('edit')+'</button>'+lvCardBtn(m)+'</div></div>';
   }
   return h+'</div></article>';
 }
@@ -556,11 +575,13 @@ function calCell(m){
 
 /* ---------- Spelers ---------- */
 function viewPlayers(){
-  var st=wasStats(),groups={A:[],B:[],X:[]},review=[];
+  var st=wasStats(),gs=guestStats(),groups={A:[],B:[],X:[]},review=[],out={A:0,B:0};
   plist().forEach(function(p){if(p.review){review.push(p);return;}(groups[p.team]||groups.X).push(p);});
+  gs.forEach(function(s){out.A+=s.at.B;out.B+=s.at.A;});
   Object.keys(groups).forEach(function(k){groups[k].sort(function(a,b){return ((a.active===false)-(b.active===false))||byOrder(a,b);});});
-  function col(k,title){var act=groups[k].filter(function(p){return p.active!==false;}).length;
-    return '<section class="panel pcol'+(S.ptab===k?' on':'')+'"><div class="ph"><h2>'+esc(title)+' <span class="cnt">'+act+'</span></h2></div>'+(groups[k].map(function(p){return prow(p,st);}).join('')||'<p class="hint">Nog geen spelers.</p>')+'</section>';}
+  function col(k,title){var act=groups[k].filter(function(p){return p.active!==false;}).length,o=k==='A'?'B':'A';
+    var tot=k==='X'?'':'<span class="gxt" title="Zo vaak speelde dit seizoen een speler van '+esc(teamLabel(k))+' mee bij '+esc(teamLabel(o))+'">'+out[k]+'× bij '+esc(o)+'</span>';
+    return '<section class="panel pcol'+(S.ptab===k?' on':'')+'"><div class="ph"><h2>'+esc(title)+' <span class="cnt">'+act+'</span></h2>'+tot+'</div>'+(groups[k].map(function(p){return prow(p,st,gs);}).join('')||'<p class="hint">Nog geen spelers.</p>')+'</section>';}
   var h='<section class="ptop"><h1>Spelers</h1>'+
     '<form class="padd" data-form="addPlayer"><input type="text" id="np-name" placeholder="Nieuwe speler, bv. Tibo V" autocomplete="off" aria-label="Naam nieuwe speler"><select id="np-team" aria-label="Ploeg"><option value="A">'+esc(teamLabel('A'))+'</option><option value="B">'+esc(teamLabel('B'))+'</option><option value="X">Extern</option></select><button class="btn primary" type="submit">'+ic('plus')+'Toevoegen</button></form></section>';
   if(review.length)h+='<div class="review">'+review.map(function(p){return '<div class="rrow"><span>'+ic('alert')+'<span><b>'+esc(p.name)+'</b> staat nieuw in de RBFA-spelerslijst'+(p.suggestTeam?', speelde al bij '+esc(teamLabel(p.suggestTeam)):'')+'. Bij welke ploeg hoort hij of zij?</span></span><span class="ract"><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="A">A</button><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="B">B</button><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="X">Extern</button></span></div>';}).join('')+'</div>';
@@ -568,11 +589,12 @@ function viewPlayers(){
   if(gone.length)h+='<div class="review"><div class="rrow"><span>'+ic('info')+'<span>Nieuw seizoen: <b>'+esc(gone.map(pName).join(', '))+'</b> '+(gone.length>1?'staan':'staat')+' niet bij '+esc(sn.teams.A)+' of '+esc(sn.teams.B)+' in RBFA. Inactief zetten? De historiek blijft bewaard.</span></span><span class="ract"><button class="btn sm" data-a="goneOff">Inactief zetten</button><button class="btn sm ghost" data-a="goneKeep">Laten staan</button></span></div></div>';
   h+='<div class="seg mob" style="margin-bottom:12px">'+['A','B','X'].map(function(k){return '<button data-a="ptab" data-k="'+k+'" aria-pressed="'+(S.ptab===k)+'">'+(k==='X'?'Extern':esc(teamLabel(k)))+' ('+groups[k].filter(function(p){return p.active!==false;}).length+')</button>';}).join('')+'</div>';
   h+='<div class="pcols">'+col('A',teamLabel('A'))+col('B',teamLabel('B'))+col('X','Extern / reserve')+'</div>';
-  h+='<p class="hint">De ploeglijst is het sjabloon: elke nieuwe match start met deze spelers. Per match schrap je afwezigen of voeg je iemand van de andere ploeg toe. Het shirtje toont hoe vaak iemand dit seizoen de was en de broodjes deed.</p>';
+  h+='<p class="hint">De ploeglijst is het sjabloon: elke nieuwe match start met deze spelers. Per match schrap je afwezigen of voeg je iemand van de andere ploeg toe. Het shirtje toont hoe vaak iemand dit seizoen de was en de broodjes deed. "2× bij B" betekent: dit seizoen 2 keer meegespeeld met de andere ploeg; bovenaan staat het totaal per ploeg.</p>';
   return h;
 }
-function prow(p,st){var s=st.get(p.id),other=p.team==='A'?'B':'A';
+function prow(p,st,gs){var s=st.get(p.id),g=gs&&gs.get(p.id),other=p.team==='A'?'B':'A';
   return '<div class="prow'+(p.active===false?' inactive':'')+'"><button class="pn" data-a="pEdit" data-p="'+esc(p.id)+'">'+esc(p.name)+(p.active===false?' <small>inactief</small>':'')+'</button>'+
+  (g?'<span class="ogx" title="Dit seizoen meegespeeld met de andere ploeg: '+esc(g.dates.map(dShort).join(', '))+'">'+esc(guestTxt(g))+'</span>':'')+
   '<span class="wc'+(s?'':' zero')+'" title="Was + broodjes'+(s?', laatst '+esc(dShort(s.last)):'')+'">'+ic('shirt')+(s?s.n:0)+'</span>'+
   (p.team!=='X'?'<button class="btn sm ghost" data-a="pMove" data-p="'+esc(p.id)+'" data-to="'+other+'" title="Verhuis naar '+esc(teamLabel(other))+'">'+ic('swap')+other+'</button>':'<button class="btn sm ghost" data-a="pEdit" data-p="'+esc(p.id)+'">'+ic('edit')+'</button>')+'</div>';}
 
@@ -606,6 +628,10 @@ function viewMore(){
     ph.map(function(d,i){return '<div class="phase"><input type="date" id="ph-'+i+'" data-ch="phase" data-i="'+i+'" value="'+esc(d)+'"><span class="hint">speeldag 1'+(i?' (reeks '+(i+1)+')':'')+'</span><button class="btn sm ghost" data-a="phaseDel" data-i="'+i+'" aria-label="Verwijder">'+ic('trash')+'</button></div>';}).join('')+
     '<div class="phase"><input type="date" id="ph-new" data-ch="phaseAdd" aria-label="Nieuwe reeks"><span class="hint">nieuwe reeks toevoegen</span></div></div></section>';
   h+='<section class="panel"><h2 style="margin-bottom:6px">Was + broodjes per week</h2>'+histHTML()+'</section>';
+  if(S.admin){var lo=c.live||{};
+    h+='<section class="panel"><h2 style="margin-bottom:6px">Wissels tijdens de match</h2><p class="hint" style="font-size:14px">Met de knop Wissels op de matchkaart houd je tijdens de match bij wie er speelt: aanwezigen, basisopstelling, en per speler de speelminuten en hoe vaak hij op de bank zat. De planner stelt telkens de eerlijkste volgende wissel voor.</p>'+
+      '<label class="chk" style="margin-top:6px"><input type="checkbox" data-ch="lvAll"'+(lo.all?' checked':'')+'> Zichtbaar voor alle trainers</label>'+
+      '<p class="hint">'+(lo.all?'Alle trainers zien de knop Wissels.':(S.owner?'Nu zie enkel jij de knop. Zet dit aan zodra de trainers hem mogen gebruiken.':'Nu ziet enkel de eigenaar de knop.'))+' <a href="wissels.html">Uitleg met screenshots</a></p></section>';}
   var r=c.rbfa||{},tn=r.teamNames||{};
   var picker=function(k){var cur=tn[k]||('U11 '+k);if(!CLUBTEAMS)return fld('RBFA-ploeg voor '+teamLabel(k),'<input type="text" id="rb-team-'+k+'" value="'+esc(cur)+'" disabled>');
     var opts=CLUBTEAMS.map(function(t){return '<option'+(t.name===cur?' selected':'')+'>'+esc(t.name)+'</option>';}).join('');if(!findTeam(CLUBTEAMS,cur))opts='<option selected>'+esc(cur)+' (niet gevonden)</option>'+opts;
@@ -671,9 +697,9 @@ var SHEETS={
       '<label class="fld"><span>Andere naam</span><span class="row"><input type="text" id="tr-new" placeholder="Naam" autocomplete="off"><button class="btn" data-a="tAdd">'+ic('plus')+'Voeg toe</button></span></label>'+
       '<p class="hint">Op het schema: <b>'+esc(joinNames(sh.cur)||'niemand')+'</b></p>'+
       acts('<button class="btn ghost spacer" data-a="tDefault">Standaard van '+esc(teamLabel(m.team))+'</button>','<button class="btn ghost" data-a="closeSheet">Annuleer</button><button class="btn primary" data-a="saveTrainers">Opslaan</button>');},
-  addP:function(sh){var m=getM(sh.id);if(!m)return '';var sel=selection(m),ot=m.team==='A'?'B':'A';
+  addP:function(sh){var m=getM(sh.id);if(!m)return '';var sel=selection(m),ot=m.team==='A'?'B':'A',gs=guestStats();
     var others=plist().filter(function(p){return sel.indexOf(p.id)<0&&p.active!==false&&!p.review;});
-    function grp(t,title){var arr=others.filter(function(p){return p.team===t;}).sort(byOrder);return arr.length?'<h3>'+esc(title)+'</h3><div class="chips">'+arr.map(function(p){return '<button class="bchip" data-a="pIn" data-id="'+esc(m.id)+'" data-p="'+esc(p.id)+'">'+ic('plus')+esc(p.name)+'</button>';}).join('')+'</div>':'';}
+    function grp(t,title){var arr=others.filter(function(p){return p.team===t;}).sort(byOrder);return arr.length?'<h3>'+esc(title)+'</h3><div class="chips">'+arr.map(function(p){return '<button class="bchip" data-a="pIn" data-id="'+esc(m.id)+'" data-p="'+esc(p.id)+'">'+ic('plus')+esc(p.name)+(t===ot?guestChip(gs,p.id):'')+'</button>';}).join('')+'</div>'+(t===ot?guestHint(gs,arr):''):'';}
     var body=grp(m.team,'Eigen ploeg')+grp(ot,'Van '+teamLabel(ot))+grp('X','Extern / reserve');
     return '<h2>Speler toevoegen</h2><p class="sub">'+esc(matchTitle(m))+'</p>'+(body||'<p class="hint">Alle gekende spelers staan al in de selectie.</p>')+
       '<h3>Nieuwe speler</h3><div class="row"><input type="text" id="ap-name" placeholder="Voornaam + initiaal" autocomplete="off" aria-label="Naam"><select id="ap-team" aria-label="Soort speler" style="max-width:48%"><option value="X">Extern (gastspeler)</option><option value="'+m.team+'">Vaste speler '+esc(teamLabel(m.team))+'</option><option value="'+ot+'">Vaste speler '+esc(teamLabel(ot))+'</option></select></div>'+
@@ -708,8 +734,9 @@ var SHEETS={
   opp:function(sh){var o=sh.id?(S.opponents.get(sh.id)||{}):{};var n=allMatches().filter(function(m){return sh.id&&m.opponentId===sh.id;}).length;
     return '<h2>'+(sh.id?esc(o.name||'Tegenstander'):'Nieuwe tegenstander')+'</h2><p class="sub">'+(o.source==='rbfa'?'Uit de RBFA-kalender':'Zelf toegevoegd')+(n?' · '+n+' match'+(n>1?'en':''):'')+'</p>'+oppFields(o)+
       acts((sh.id&&!n)?'<button class="btn ghost danger spacer" data-a="delOpp" data-confirm="Tik nogmaals om te verwijderen">'+ic('trash')+'Verwijderen</button>':'','<button class="btn ghost" data-a="closeSheet">Annuleer</button><button class="btn primary" data-a="saveOpp">Opslaan</button>');},
-  player:function(sh){var p=S.players.get(sh.id);if(!p)return '';var st=wasStats().get(p.id),team=sh.team||p.team;
-    return '<h2>'+esc(p.name)+'</h2><p class="sub">'+(st?'Was + broodjes dit seizoen: '+st.n+' keer, laatst '+esc(dShort(st.last)):'Dit seizoen nog geen was + broodjes gedaan')+'</p>'+
+  player:function(sh){var p=S.players.get(sh.id);if(!p)return '';var st=wasStats().get(p.id),gx=guestStats().get(p.id),team=sh.team||p.team;
+    return '<h2>'+esc(p.name)+'</h2><p class="sub">'+(st?'Was + broodjes dit seizoen: '+st.n+' keer, laatst '+esc(dShort(st.last)):'Dit seizoen nog geen was + broodjes gedaan')+
+      (p.team==='A'||p.team==='B'?'<br>'+(gx?'Meegespeeld met de andere ploeg: '+gx.n+' keer ('+esc(gx.dates.map(dShort).join(', '))+')':'Dit seizoen nog niet meegespeeld met de andere ploeg'):'')+'</p>'+
       '<label class="fld"><span>Naam op het schema</span><input type="text" id="pl-name" value="'+esc(p.name)+'" autocomplete="off"></label>'+
       '<div class="fld"><span>Vaste ploeg</span><div class="seg">'+['A','B','X'].map(function(t){return '<button data-a="plTeam" data-v="'+t+'" aria-pressed="'+(team===t)+'">'+(t==='X'?'Extern':esc(teamLabel(t)))+'</button>';}).join('')+'</div></div>'+
       '<div class="row2"><label class="fld"><span>Plaats in de lijst</span><input type="number" inputmode="numeric" id="pl-order" value="'+esc(p.order==null?'':p.order)+'"></label><label class="chk" style="align-self:center;margin-top:14px"><input type="checkbox" id="pl-active"'+(p.active!==false?' checked':'')+'> Actief</label></div>'+
@@ -850,7 +877,7 @@ function importBackup(text){var d=null;try{d=JSON.parse(text);}catch(e){}
   if(!d||d.app!=='hechtel-u11-backup'||!d.collections){toast('Dit is geen back-up van de planner.');return;}
   var n=0,cols=d.collections;
   if(cols.config&&cols.config.main){write('config','main','set',cols.config.main);n++;}
-  ['players','opponents','matches','weeks'].forEach(function(c){var o=cols[c]||{};Object.keys(o).forEach(function(id){write(c,id,'set',o[id]);n++;});});
+  ['players','opponents','matches','weeks','games'].forEach(function(c){var o=cols[c]||{};Object.keys(o).forEach(function(id){write(c,id,'set',o[id]);n++;});});
   toast(n+' gegevens teruggezet.');setTimeout(function(){syncRbfa(true);},2500);}
 var AUTH=null,FS=null;
 function authMsg(e){var c=(e&&e.code)||'';
@@ -878,10 +905,10 @@ function captureMatchDraft(){var sh=S.sheet;if(!sh||!sh.d)return;var g=function(
   var v;if((v=g('md-date'))!=null)sh.d.date=v;if((v=g('md-time'))!=null)sh.d.time=v;if((v=g('md-opp'))!=null)sh.d.opponentId=v;if((v=g('md-note'))!=null)sh.d.note=v;
   if($('#of-name'))sh.nd=Object.assign(readOpp(),{});}
 var ACT={
-  nav:function(d){S.view=d.v;try{localStorage.setItem('hu11.view',d.v);}catch(e){}render();window.scrollTo(0,0);},
+  nav:function(d){lvLeave();S.view=d.v;try{localStorage.setItem('hu11.view',d.v);}catch(e){}render();window.scrollTo(0,0);},
   wk:function(d){S.week=addDays(S.week||defaultWeek(),7*Number(d.d));render();},
   wkNow:function(){S.week=defaultWeek();render();},
-  goWeek:function(d){S.view='week';S.week=d.wk;try{localStorage.setItem('hu11.view','week');}catch(e){}if(S.sheet)closeSheet();render();window.scrollTo(0,0);},
+  goWeek:function(d){lvLeave();S.view='week';S.week=d.wk;try{localStorage.setItem('hu11.view','week');}catch(e){}if(S.sheet)closeSheet();render();window.scrollTo(0,0);},
   weekTitle:function(){openSheet('week');},
   saveWeek:function(){var t=$('#wk-title').value.trim(),w=S.weeks.get(S.week);write('weeks',S.week,w?'update':'set',{title:t||null});closeSheet();},
   pOut:function(d){var m=getM(d.id);if(!m)return;var sel=selection(m),prev=Array.isArray(m.players)?m.players.slice():null,prevW=m.wasId||null;
@@ -935,9 +962,9 @@ var ACT={
   pEdit:function(d){openSheet('player',{id:d.p});},
   plTeam:function(d){var n=$('#pl-name'),o=$('#pl-order'),a=$('#pl-active');S.sheet.team=d.v;var keep={n:n&&n.value,o:o&&o.value,a:a&&a.checked};renderSheet();if(keep.n!=null)$('#pl-name').value=keep.n;if(keep.o!=null)$('#pl-order').value=keep.o;if(keep.a!=null)$('#pl-active').checked=keep.a;},
   savePlayer:function(){var sh=S.sheet,p=S.players.get(sh.id);if(!p)return closeSheet();var nm=$('#pl-name').value.trim();if(!nm){toast('Vul een naam in.');return;}var ov=$('#pl-order').value.trim();
-    upd('players',p.id,{name:nm,team:sh.team||p.team,order:ov===''?null:Number(ov),active:$('#pl-active').checked,review:false});closeSheet();},
+    upd('players',p.id,Object.assign(moveP(p,sh.team||p.team),{name:nm,order:ov===''?null:Number(ov),active:$('#pl-active').checked,review:false}));closeSheet();},
   delPlayer:function(){var id=S.sheet.id,nm=pName(id);write('players',id,'delete',null);closeSheet();toast(nm+' verwijderd.');},
-  pMove:function(d){var p=S.players.get(d.p);if(!p)return;var from=p.team;upd('players',d.p,{team:d.to});toast(p.name+' staat nu bij '+teamLabel(d.to),function(){upd('players',d.p,{team:from});});},
+  pMove:function(d){var p=S.players.get(d.p);if(!p)return;var prev={team:p.team,prevTeam:p.prevTeam||null,movedAt:p.movedAt||null};upd('players',d.p,moveP(p,d.to));toast(p.name+' staat nu bij '+teamLabel(d.to),function(){upd('players',d.p,prev);});},
   pTeam:function(d){upd('players',d.p,{team:d.to,review:false,active:true});},
   ptab:function(d){S.ptab=d.k;render();},
   export:function(){openSheet('export',{weeks:[S.week]});},
@@ -953,8 +980,8 @@ var ACT={
   retryAccess:function(){S.db='wait';S.retried=false;render();var u=AUTH&&AUTH.currentUser;(u?u.getIdToken(true):Promise.resolve()).then(subscribe,subscribe);},
   loginAgain:function(){S.login={};render();},
   startEmpty:function(){write('config','main','set',merge(DEFAULT_CONFIG,{createdAt:new Date().toISOString()}));setTimeout(function(){syncRbfa(true);},800);},
-  backup:function(){var out={app:'hechtel-u11-backup',v:1,exportedAt:new Date().toISOString(),collections:{config:{main:S.config||{}},players:{},opponents:{},matches:{},weeks:{}}};
-    ['players','opponents','matches','weeks'].forEach(function(c){S[c].forEach(function(v,k){var d=Object.assign({},v);delete d.id;out.collections[c][k]=d;});});
+  backup:function(){var out={app:'hechtel-u11-backup',v:1,exportedAt:new Date().toISOString(),collections:{config:{main:S.config||{}},players:{},opponents:{},matches:{},weeks:{},games:{}}};
+    ['players','opponents','matches','weeks','games'].forEach(function(c){S[c].forEach(function(v,k){var d=Object.assign({},v);delete d.id;out.collections[c][k]=d;});});
     dlFile(new File([JSON.stringify(out,null,1)],'hechtel-u11-backup-'+today()+'.json',{type:'application/json'}));},
   delMember:function(d){write('members',d.e,'delete',null);toast('Toegang ingetrokken voor '+d.e+'.');},
   goneOff:function(){var sn=(cfg().rbfa||{}).seasonNotice||{};(sn.gone||[]).forEach(function(id){if(S.players.has(id))upd('players',id,{active:false});});saveCfg('rbfa.seasonNotice',null);toast('Spelers op inactief gezet.');},
@@ -974,6 +1001,329 @@ var CH={
   phaseAdd:function(el){if(!el.value)return;var ph=(cfg().phases||[]).slice();ph.push(el.value);saveCfg('phases',uniq(ph).sort());el.value='';},
   mdOpp:function(el){var box=$('#md-new');if(box)box.hidden=el.value!=='__new';if(S.sheet&&S.sheet.d)S.sheet.d.opponentId=el.value;}
 };
+
+/* ================= wissels tijdens de match ================= */
+/* One doc per match: games/{matchId}. Before the kick-off it holds who is absent, extra players and the line-up.
+   At the kick-off the roster is frozen in `present` and the clock starts. Every substitution is an event with the
+   match time in seconds, so playing time, bench turns and the next fair substitution are derived, never stored.
+   Writes go straight to Firestore (not through the per-doc queue) so the SDK keeps them offline on a bad field connection. */
+var GPEND=new Map(),LVT=null,WL=null,WLP=false,WLX=false;
+function liveOn(){var l=cfg().live||{};return !!(S.user&&(S.owner||l.all));}
+function gameOf(id){return S.games.get(id)||null;}
+function gState(g){return (g&&g.clock&&g.clock.state)||'pre';}
+function perWord(n){n=Number(n)||4;return n===2?'helft':n===4?'kwart':'periode';}
+function perLbl(g,p){return p+'e '+perWord(g&&g.per);}
+function mmss(s){s=Math.max(0,Math.floor(s));return pad(Math.floor(s/60))+':'+pad(s%60);}
+function mins(s){return Math.floor(Math.max(0,s)/60)+'′';}
+function gNow(g){var c=(g&&g.clock)||{},t=Number(c.acc)||0;if(c.state==='play'&&c.since)t+=Math.max(0,(Date.now()-Number(c.since))/1000);return t;}
+function gName(g,id){var p=S.players.get(id);return p?p.name:((g&&g.names&&g.names[id])||'?');}
+function lvSort(m,ids){var k=ids.filter(function(id){return S.players.has(id);}),u=ids.filter(function(id){return !S.players.has(id);});return sortSel(m,k).concat(u);}
+function lvHashId(){var x=/^#wissels\/(.+)$/.exec(location.hash||'');if(!x)return null;try{return decodeURIComponent(x[1]);}catch(e){return null;}}
+function lvCur(){var m=S.liveId?getM(S.liveId):null;return {m:m,g:m?gameOf(m.id):null};}
+function teamGames(team,exclude){var out=[];S.games.forEach(function(g,id){if(id===exclude)return;var mm=getM(id),t=(mm&&mm.team)||g.team,d=(mm&&eff(mm).date)||g.date;if(t===team&&d)out.push({id:id,g:g,d:d});});return out.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0;});}
+function defN(m){var a=teamGames(m.team,m.id).filter(function(x){return Number(x.g.n)>0;});return a.length?Number(a[a.length-1].g.n):8;}
+function defPer(m){var a=teamGames(m.team,m.id).filter(function(x){return Number(x.g.per)>0;});return a.length?Number(a[a.length-1].g.per):4;}
+
+function gwrite(id,patch){
+  if(!S.canWrite){toast('Je kan deze planning enkel bekijken.');return false;}
+  if(!DB){toast('De gedeelde gegevens zijn niet beschikbaar.');return false;}
+  patch.updatedAt=new Date().toISOString();
+  var op={mode:'update',data:patch},arr=GPEND.get(id);if(!arr){arr=[];GPEND.set(id,arr);}arr.push(op);applyTo('games',id,op);
+  var done=function(){var a=GPEND.get(id);if(!a)return;var i=a.indexOf(op);if(i>=0)a.splice(i,1);if(!a.length)GPEND.delete(id);};
+  DB.doc('games/'+id).update(patch).then(done,function(err){done();var c=err&&err.code;toast(c==='permission-denied'?'Bewaren lukt niet: je hebt geen toegang.':'Bewaren mislukt ('+(c||'fout')+'). Probeer opnieuw.');render();});
+  render();return true;
+}
+function gdelete(id){
+  if(!DB)return;var op={mode:'delete'},arr=GPEND.get(id);if(!arr){arr=[];GPEND.set(id,arr);}arr.push(op);applyTo('games',id,op);
+  var done=function(){var a=GPEND.get(id);if(!a)return;var i=a.indexOf(op);if(i>=0)a.splice(i,1);if(!a.length)GPEND.delete(id);};
+  DB.doc('games/'+id).delete().then(done,function(){done();toast('Wissen mislukt. Probeer opnieuw.');render();});render();
+}
+function gput(m,patch){if(!gameOf(m.id))patch=Object.assign({mid:m.id,team:m.team,date:eff(m).date,n:defN(m),per:defPer(m),absent:[],extra:[],lineup:[],gk:null,ev:[],clock:{state:'pre'},createdAt:new Date().toISOString()},patch);return gwrite(m.id,patch);}
+function gCands(m,g){return uniq(selection(m).concat(((g&&g.extra)||[]).filter(function(id){return S.players.has(id);})));}
+function gRoster(m,g){if(g&&gState(g)!=='pre'&&Array.isArray(g.present))return g.present.slice();var ab=new Set((g&&g.absent)||[]);return gCands(m,g).filter(function(id){return !ab.has(id);});}
+function lvEv(g,e){var c=g.clock||{},t=Math.round(gNow(g));e.t=t;e.p=Number(c.p)||1;e.q=Math.max(0,t-Math.round(Number(c.ps)||0));return e;}
+
+/* playing time (pt), bench time (bt), bench turns (nb), current stint (cur) and keeper time (gkT) per player at match second T */
+function gStats(g,T){
+  var st=new Map(),L=new Set(g.lineup||[]),gk=(g.gk&&L.has(g.gk))?g.gk:null,gkFrom=0,last=0;
+  (g.present||[]).forEach(function(id){st.set(id,{id:id,on:L.has(id),inR:true,pt:0,bt:0,nb:L.has(id)?0:1,from:0,gkT:0,late:false,cur:0});});
+  function close(s,t){var d=t-s.from;if(d>0){if(s.on)s.pt+=d;else s.bt+=d;}s.from=t;}
+  function gkTo(id,t){if(gk&&st.has(gk))st.get(gk).gkT+=Math.max(0,t-gkFrom);gk=id||null;gkFrom=t;}
+  (g.ev||[]).forEach(function(e){
+    var t=Math.min(Math.max(Number(e.t)||0,last),T);last=t;
+    if(e.k==='sub'){var o=st.get(e.o),i=st.get(e.i);if(!o||!i||!o.on||i.on||!i.inR)return;close(o,t);close(i,t);o.on=false;o.nb++;i.on=true;if(gk===e.o)gkTo(e.i,t);}
+    else if(e.k==='gk'){if(!e.id)gkTo(null,t);else{var k=st.get(e.id);if(k&&k.on&&k.inR)gkTo(e.id,t);}}
+    else if(e.k==='add'){var a=st.get(e.id);if(!a)st.set(e.id,{id:e.id,on:false,inR:true,pt:0,bt:0,nb:0,from:t,gkT:0,late:true,cur:0});else if(!a.inR){a.inR=true;a.on=false;a.from=t;}}
+    else if(e.k==='del'){var r=st.get(e.id);if(r&&r.inR&&!r.on){close(r,t);r.inR=false;}}
+  });
+  st.forEach(function(s){if(!s.inR)return;var d=T-s.from;if(d>0){if(s.on)s.pt+=d;else s.bt+=d;}s.cur=Math.max(0,T-s.from);});
+  if(gk&&st.has(gk))st.get(gk).gkT+=Math.max(0,T-gkFrom);
+  return {st:st,gk:gk,T:T};
+}
+/* next fair substitution: in = least played (whole minutes), then waiting longest; out = most played, then fewest bench turns, then longest on the field. The keeper stays. */
+function gSuggest(R){
+  var f=[],b=[];R.st.forEach(function(s){if(s.inR)(s.on?f:b).push(s);});
+  var outs=f.filter(function(s){return s.id!==R.gk;});
+  if(!b.length||!outs.length)return null;
+  var M=function(x){return Math.floor(x/60);};
+  b.sort(function(x,y){return M(x.pt)-M(y.pt)||x.from-y.from||(x.id<y.id?-1:1);});
+  outs.sort(function(x,y){return M(y.pt)-M(x.pt)||x.nb-y.nb||x.from-y.from||(x.id<y.id?-1:1);});
+  if(M(outs[0].pt)<=M(b[0].pt))return null;
+  return {i:b[0].id,o:outs[0].id};
+}
+function prevBench(m){var d=eff(m).date,best=null;teamGames(m.team,m.id).forEach(function(x){if(x.d<=d&&gState(x.g)!=='pre'&&Array.isArray(x.g.present))best=x;});
+  var out=new Set();if(best){var L=new Set(best.g.lineup||[]);best.g.present.forEach(function(id){if(!L.has(id))out.add(id);});}return out;}
+function hasHistory(m){var d=eff(m).date;return teamGames(m.team,m.id).some(function(x){return x.d<=d&&gState(x.g)!=='pre'&&Array.isArray(x.g.present);});}
+/* line-up proposal: who started on the bench last time starts now, then who started on the bench most often this season */
+function lineupSuggest(m,g,R,n){
+  var d=eff(m).date,ss=seasonStart(d),stat=new Map(),Z={n:0,b:0,last:false};
+  teamGames(m.team,m.id).forEach(function(x){if(x.d<ss||x.d>d||gState(x.g)==='pre'||!Array.isArray(x.g.present))return;var L=new Set(x.g.lineup||[]);
+    x.g.present.forEach(function(id){var s=stat.get(id)||{n:0,b:0,last:false};s.n++;s.last=!L.has(id);if(s.last)s.b++;stat.set(id,s);});});
+  var keep=(g&&g.gk&&R.indexOf(g.gk)>=0)?[g.gk]:[],rest=R.filter(function(id){return keep.indexOf(id)<0;});
+  rest.sort(function(a,b){var A=stat.get(a)||Z,B=stat.get(b)||Z;return ((B.last?1:0)-(A.last?1:0))||((B.n?B.b/B.n:0)-(A.n?A.b/A.n:0))||(hash(m.id+a)-hash(m.id+b));});
+  return keep.concat(rest).slice(0,n);
+}
+function evText(g,e){
+  if(e.k==='sub')return gName(g,e.i)+' erin, '+gName(g,e.o)+' eruit';
+  if(e.k==='gk')return e.id?gName(g,e.id)+' in doel':'Geen vaste keeper meer';
+  if(e.k==='add')return gName(g,e.id)+' erbij';
+  if(e.k==='del')return gName(g,e.id)+' doet niet meer mee';
+  return '';}
+function evWhen(g,e){return (e.p?e.p+'e '+perWord(g.per)+' · ':'')+mmss(e.q||0);}
+
+function lvCardBtn(m){
+  if(!liveOn()||m.status==='geannuleerd')return '';
+  var g=gameOf(m.id),st=gState(g),mid=esc(m.id),p=g&&g.clock?Number(g.clock.p)||1:1;
+  if(!g&&eff(m).date<today())return '';
+  if(st==='play')return '<button class="lvbtn live" data-a="live" data-id="'+mid+'">'+ic('swap')+'Live · '+esc(perLbl(g,p))+'</button>';
+  if(st==='break')return '<button class="lvbtn paused" data-a="live" data-id="'+mid+'">'+ic('swap')+'Na '+esc(perLbl(g,p))+'</button>';
+  if(st==='end')return '<button class="lvbtn" data-a="live" data-id="'+mid+'">'+ic('clock')+'Speeltijd</button>';
+  return '<button class="lvbtn" data-a="live" data-id="'+mid+'">'+ic('swap')+'Wissels</button>';
+}
+function openLive(id,fromHash){
+  if(S.view!=='live')S.prevView=S.view;S.view='live';S.liveId=id;S.lvSel=null;S.lvStep=null;
+  if(!fromHash){try{history.pushState({lv:id},'','#wissels/'+encodeURIComponent(id));}catch(e){}}
+  if(S.sheet)closeSheet();render();window.scrollTo(0,0);
+}
+function lvLeave(){S.liveId=null;S.lvSel=null;S.lvStep=null;if(lvHashId()){try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}}}
+function lvClose(){var pv=S.prevView;S.view=(pv&&pv!=='live')?pv:'week';lvLeave();render();window.scrollTo(0,0);}
+
+function viewLive(){
+  var m=getM(S.liveId),back='<button class="icon-btn" data-a="lvBack" aria-label="Terug">'+ic('chevL')+'</button>';
+  if(!m)return '<div class="lv"><section class="lvhead">'+back+'<div class="lvt"><h1>Wissels</h1></div></section><div class="empty"><b>Match niet gevonden</b>Deze match staat niet meer in de planner.</div></div>';
+  var g=gameOf(m.id),st=gState(g),e=eff(m),us='<span class="hc">'+esc(teamLabel(m.team))+'</span>',th=esc(oppName(m));
+  var h='<section class="lvhead">'+back+'<div class="lvt"><h1>'+(m.home?us+' – '+th:th+' – '+us)+'</h1><p>'+esc(dShort(e.date))+' · aftrap '+esc(e.time)+'</p></div>'+
+    '<a class="help" href="wissels.html" aria-label="Uitleg over de wissels" title="Uitleg">'+ic('help')+'</a>'+
+    (g?'<button class="icon-btn" data-a="lvMenu" aria-label="Meer opties">'+ic('dots')+'</button>':'')+'</section>';
+  if(st==='pre')h+=(S.lvStep==='lineup'||(!S.lvStep&&g&&(g.lineup||[]).length))?lvLineup(m,g):lvRoster(m,g);
+  else if(st==='end')h+=lvSummary(m,g);
+  else h+=lvLive(m,g);
+  return '<div class="lv">'+h+'</div>';
+}
+function lvRoster(m,g){
+  var cands=gCands(m,g),ab=new Set((g&&g.absent)||[]),n=cands.filter(function(id){return !ab.has(id);}).length;
+  return '<div class="lvstep"><span class="no">1</span><div><h2>Wie is er?</h2><p>De selectie staat klaar. Tik op wie er niet is.</p></div></div>'+
+    '<div class="sellbl"><span>Aanwezig</span><span class="count">'+n+' van '+cands.length+'</span></div>'+
+    '<div class="lvgrid">'+lvSort(m,cands).map(function(id){var off=ab.has(id),p=S.players.get(id),tag=off?'afwezig':(p.team!==m.team?(p.team==='X'?'extern':esc(p.team)):'');
+      return '<button class="lvr'+(off?' off':'')+'" data-a="lvPres" data-p="'+esc(id)+'" aria-pressed="'+(!off)+'">'+ic(off?'x':'check')+'<span class="n">'+esc(p.name)+'</span>'+(tag?'<small>'+tag+'</small>':'')+'</button>';}).join('')+'</div>'+
+    '<div class="lvact"><button class="btn" data-a="lvAddOpen">'+ic('plus')+'Invaller</button><button class="btn primary grow" data-a="lvStep" data-v="lineup">Verder: basisopstelling'+ic('chevR')+'</button></div>';
+}
+function lvLineup(m,g){
+  var R=gRoster(m,g),n=Math.min(Number(g&&g.n)||defN(m),R.length),per=Number(g&&g.per)||defPer(m);
+  var L=((g&&g.lineup)||[]).filter(function(id){return R.indexOf(id)>=0;}),Ls=new Set(L),bench=R.filter(function(id){return !Ls.has(id);});
+  var gk=(g&&g.gk&&Ls.has(g.gk))?g.gk:'',pb=prevBench(m),left=n-L.length;
+  function tile(id,on){return '<button class="lt '+(on?'on':'bench')+'" data-a="lvLine" data-p="'+esc(id)+'"><span class="n">'+esc(gName(g,id))+(id===gk?'<i class="kp" title="Keeper">K</i>':'')+'</span>'+(pb.has(id)?'<span class="s">vorige keer bank</span>':'')+'</button>';}
+  var h='<div class="lvstep"><span class="no">2</span><div><h2>Basisopstelling</h2><p>'+(left>0?'Tik wie start. Nog '+left+' kiezen.':left<0?'Te veel: tik '+(-left)+' speler'+(-left>1?'s':'')+' terug naar de bank.':'Klaar. Druk op Aftrap als de match begint.')+'</p></div></div>';
+  h+='<div class="lvcfg"><span class="stepper"><button data-a="lvN" data-d="-1" aria-label="Eén speler minder op het veld"'+(n<=4?' disabled':'')+'>−</button><b>'+n+'</b><button data-a="lvN" data-d="1" aria-label="Eén speler meer op het veld"'+(n>=Math.min(11,R.length)?' disabled':'')+'>+</button><span>op het veld</span></span>'+
+    '<div class="seg"><button data-a="lvPerSet" data-v="4" aria-pressed="'+(per===4)+'">4 kwarten</button><button data-a="lvPerSet" data-v="2" aria-pressed="'+(per===2)+'">2 helften</button></div></div>';
+  h+='<div class="sellbl"><span>Op het veld</span><span class="count">'+L.length+' van '+n+'</span></div><div class="lvgrid">'+(L.length?lvSort(m,L).map(function(id){return tile(id,true);}).join(''):'<p class="hint lvempty">Nog niemand. Tik hieronder op wie start.</p>')+'</div>';
+  h+='<label class="fld lvgk"><span>Keeper</span><select data-ch="lvGkPre"'+(L.length?'':' disabled')+'><option value="">'+(L.length?'Kies de keeper':'Zet eerst spelers op het veld')+'</option>'+lvSort(m,L).map(function(id){return '<option value="'+esc(id)+'"'+(id===gk?' selected':'')+'>'+esc(gName(g,id))+'</option>';}).join('')+'</select></label>';
+  h+='<div class="sellbl"><span>Bank</span><span class="count">'+bench.length+'</span></div><div class="lvgrid">'+(bench.length?lvSort(m,bench).map(function(id){return tile(id,false);}).join(''):'<p class="hint lvempty">Iedereen staat op het veld.</p>')+'</div>';
+  h+='<div class="lvact"><button class="btn ghost" data-a="lvStep" data-v="roster">'+ic('chevL')+'Wie is er?</button>'+(hasHistory(m)?'<button class="btn" data-a="lvSuggest">Voorstel</button>':'')+'<button class="btn ok grow" data-a="lvKick"'+(n>0&&L.length===n?'':' disabled')+'>'+ic('play')+'Aftrap</button></div>';
+  return h;
+}
+function lvSubTxt(s){return s.on?s.nb+'× bank':s.nb+'× bank · wacht '+mins(s.cur);}
+function lvHi(sug,id,R){var sel=S.lvSel?R.st.get(S.lvSel):null;return {i:!!sug&&sug.i===id&&(!sel||sel.on),o:!!sug&&sug.o===id&&(!sel||!sel.on)};}
+function lvTile(g,s,R,sug){
+  var hi=lvHi(sug,s.id,R),cls='lt '+(s.on?'on':'bench')+(S.lvSel===s.id?' sel':'')+(hi.i?' sg-in':'')+(hi.o?' sg-out':'');
+  return '<button class="'+cls+'" data-a="lvTap" data-p="'+esc(s.id)+'"><span class="n">'+esc(gName(g,s.id))+(R.gk===s.id?'<i class="kp" title="Keeper">K</i>':'')+'</span><span class="m" data-lvm>'+mins(s.pt)+'</span><span class="s" data-lvs>'+lvSubTxt(s)+'</span></button>';
+}
+function lvSugHTML(g,sug,selS){
+  if(selS)return '<div class="lvsug pick" id="lv-sug">'+ic('swap')+'<span class="tx"><b>'+esc(gName(g,selS.id))+'</b> '+(selS.on?'eruit. Tik wie erin komt.':'erin. Tik wie eruit gaat.')+'</span><button class="btn sm" data-a="lvCancel">Annuleer</button></div>';
+  if(!sug)return '<div class="lvsug idle" id="lv-sug">'+ic('swap')+'<span class="tx">Wisselen: tik op een speler op het veld en daarna op een speler op de bank.</span></div>';
+  return '<div class="lvsug" id="lv-sug">'+ic('swap')+'<span class="tx">Volgende wissel: <b class="in">'+esc(gName(g,sug.i))+'</b> erin voor <b class="out">'+esc(gName(g,sug.o))+'</b></span><button class="btn sm ok" data-a="lvSub" data-i="'+esc(sug.i)+'" data-o="'+esc(sug.o)+'">Wissel</button></div>';
+}
+function lvLive(m,g){
+  var T=gNow(g),R=gStats(g,T),c=g.clock||{},st=c.state,p=Number(c.p)||1,per=Number(g.per)||4;
+  var sug=gSuggest(R);S.lvSugKey=sug?sug.i+'|'+sug.o:'';
+  var f=[],b=[];R.st.forEach(function(s){if(s.inR)(s.on?f:b).push(s.id);});
+  if(S.lvSel&&!(R.st.get(S.lvSel)||{}).inR)S.lvSel=null;
+  var selS=S.lvSel?R.st.get(S.lvSel):null;
+  var h='<div class="lvclock'+(st==='break'?' paused':'')+'"><button class="ck" data-a="lvClock" aria-label="Klok bijstellen"><small>'+esc(st==='break'?'Na '+perLbl(g,p):perLbl(g,p))+'</small><span id="lv-clock">'+mmss(T-(Number(c.ps)||0))+'</span></button>'+
+    (st==='play'?'<button class="btn lvper" data-a="lvPer">'+ic('stop')+(p>=per?'Einde match':'Einde '+esc(perLbl(g,p)))+'</button>':'<button class="btn ok lvper" data-a="lvPer">'+ic('play')+'Start '+esc(perLbl(g,p+1))+'</button>')+'</div>';
+  h+=lvSugHTML(g,sug,selS);
+  h+='<div class="sellbl"><span>Op het veld</span><span class="count">'+(selS&&!selS.on?'tik wie eruit gaat':f.length+' spelers')+'</span></div><div class="lvgrid">'+lvSort(m,f).map(function(id){return lvTile(g,R.st.get(id),R,sug);}).join('')+'</div>';
+  h+='<div class="sellbl"><span>Bank</span><span class="count">'+(selS&&selS.on?'tik wie erin komt':b.length+(b.length===1?' speler':' spelers'))+'</span></div><div class="lvgrid">'+(b.length?lvSort(m,b).map(function(id){return lvTile(g,R.st.get(id),R,sug);}).join(''):'<p class="hint lvempty">Niemand op de bank.</p>')+'</div>';
+  var ev=g.ev||[],le=ev[ev.length-1];
+  if(le)h+='<div class="lvlast"><span>'+ic('undo')+'<span>'+esc(evText(g,le))+'</span></span><button class="btn sm" data-a="lvUndo">Ongedaan maken</button></div>';
+  return h;
+}
+function lvSummary(m,g){
+  var T=gNow(g),R=gStats(g,T),arr=[];R.st.forEach(function(s){arr.push(s);});
+  arr.sort(function(a,b){return b.pt-a.pt||String(gName(g,a.id)).localeCompare(gName(g,b.id),'nl');});
+  var avg=arr.length?arr.reduce(function(a,s){return a+s.pt;},0)/arr.length:0;
+  var h='<div class="lvclock done"><span class="ck"><small>Match afgelopen</small><span>'+Math.round(T/60)+' min</span></span><span class="avg">gemiddeld <b>'+Math.round(avg/60)+' min</b> per speler</span></div>';
+  h+='<div class="sellbl"><span>Speeltijd</span><span class="count">'+arr.length+' spelers</span></div><div class="lvsum">'+arr.map(function(s){var w=T>0?Math.min(100,Math.round(100*s.pt/T)):0,lo=avg>0&&s.pt<avg*0.8;
+    var extra=(s.gkT>=60?' · '+Math.floor(s.gkT/60)+' min in doel':'')+(s.late?' · later erbij':'')+(!s.inR?' · vertrokken':'');
+    return '<div class="lvs'+(lo?' lo':'')+'"><span class="n">'+esc(gName(g,s.id))+(s.gkT>=60?'<i class="kp" title="Keeper">K</i>':'')+'</span><span class="m">'+mins(s.pt)+'</span><span class="bar"><i style="width:'+w+'%"></i></span><span class="s">'+s.nb+'× bank'+extra+'</span></div>';}).join('')+'</div>';
+  h+='<p class="hint">Oranje: minder dan 80% van het gemiddelde gespeeld.</p>';
+  h+='<div class="lvact"><button class="btn" data-a="lvReopen">'+ic('undo')+'Heropen</button><button class="btn primary grow" data-a="lvBack">Terug naar de planner</button></div>';
+  return h;
+}
+function lvDoSub(m,g,o,i){
+  var R=gStats(g,gNow(g)),so=R.st.get(o),si=R.st.get(i);
+  if(!so||!si||!so.on||si.on||!si.inR){S.lvSel=null;render();toast('Die wissel kan niet.');return;}
+  var wasGk=R.gk===o;S.lvSel=null;
+  gwrite(m.id,{ev:(g.ev||[]).concat([lvEv(g,{k:'sub',o:o,i:i})])});
+  try{if(navigator.vibrate)navigator.vibrate(30);}catch(e){}
+  if(wasGk)toast(gName(g,i)+' erin voor '+gName(g,o)+' en staat nu in doel.',function(){openSheet('lvGk');},'Andere keeper');
+  else toast(gName(g,i)+' erin, '+gName(g,o)+' eruit.',lvUndoLast,'Ongedaan maken');
+}
+function lvUndoLast(){
+  var x=lvCur(),g=x.g;if(!g||!(g.ev||[]).length)return;var st=gState(g);
+  if(st!=='play'&&st!=='break'){toast('Heropen de match eerst.');return;}
+  gwrite(x.m.id,{ev:g.ev.slice(0,-1)});S.lvSel=null;if(S.sheet&&S.sheet.kind==='lvLog')renderSheet();toast('Laatste wissel ongedaan gemaakt.');
+}
+function lvAddPlayer(m,g,pid){
+  var st=gState(g);
+  if(st==='pre'){var ab=((g&&g.absent)||[]).filter(function(x){return x!==pid;}),ex=((g&&g.extra)||[]).slice();if(selection(m).indexOf(pid)<0&&ex.indexOf(pid)<0)ex.push(pid);gput(m,{absent:ab,extra:ex});toast(pName(pid)+' is erbij.');return;}
+  if(st==='end')return;
+  var names=Object.assign({},g.names||{});names[pid]=pName(pid);
+  gwrite(m.id,{ev:(g.ev||[]).concat([lvEv(g,{k:'add',id:pid})]),names:names});toast(pName(pid)+' zit nu op de bank.');
+}
+
+/* ticking clock: only text nodes are updated, so a tap is never lost to a re-render */
+function lvAfter(){var on=S.view==='live';if(on&&!LVT)LVT=setInterval(lvTick,1000);else if(!on&&LVT){clearInterval(LVT);LVT=null;}wakeSync();}
+function lvTick(){
+  if(S.view!=='live'){lvAfter();return;}
+  var x=lvCur(),g=x.g;if(!g||gState(g)!=='play')return;
+  var T=gNow(g),pt=mmss(T-(Number(g.clock.ps)||0)),el=$('#lv-clock'),ct=$('#lvc-time');if(el&&el.textContent!==pt)el.textContent=pt;if(ct&&ct.textContent!==pt)ct.textContent=pt;
+  var R=gStats(g,T);
+  document.querySelectorAll('#view .lt[data-p]').forEach(function(t){var s=R.st.get(t.dataset.p);if(!s)return;var a=t.querySelector('[data-lvm]'),b=t.querySelector('[data-lvs]'),mv=mins(s.pt),sv=lvSubTxt(s);if(a&&a.textContent!==mv)a.textContent=mv;if(b&&b.textContent!==sv)b.textContent=sv;});
+  var sug=gSuggest(R),key=sug?sug.i+'|'+sug.o:'';
+  if(key!==S.lvSugKey){S.lvSugKey=key;var bar=$('#lv-sug');if(bar&&!S.lvSel)bar.outerHTML=lvSugHTML(g,sug,null);
+    document.querySelectorAll('#view .lt[data-p]').forEach(function(t){var hi=lvHi(sug,t.dataset.p,R);t.classList.toggle('sg-in',hi.i);t.classList.toggle('sg-out',hi.o);});}
+}
+/* keep the phone screen on while the clock runs */
+function wakeSync(){
+  var x=S.view==='live'?lvCur():{},want=!!(x.g&&gState(x.g)==='play'&&document.visibilityState==='visible');
+  if(want&&!WL&&!WLP&&!WLX&&navigator.wakeLock&&navigator.wakeLock.request){WLP=true;navigator.wakeLock.request('screen').then(function(l){WLP=false;WL=l;l.addEventListener('release',function(){if(WL===l)WL=null;});wakeSync();},function(){WLP=false;WLX=true;});}
+  else if(!want&&WL){var l=WL;WL=null;try{l.release().catch(function(){});}catch(e){}}
+}
+window.addEventListener('popstate',function(){var id=lvHashId();if(id){if(S.db==='ready'&&S.matches.has(id))openLive(id,true);}else if(S.view==='live')lvClose();});
+document.addEventListener('visibilitychange',function(){WLX=false;wakeSync();if(document.visibilityState==='visible')lvTick();});
+
+Object.assign(SHEETS,{
+  lvMenu:function(){var x=lvCur(),m=x.m,g=x.g;if(!g)return '';var st=gState(g),live=st==='play'||st==='break';
+    return '<h2>Wissels</h2><p class="sub">'+esc(matchTitle(m))+'</p><div class="menu">'+
+      (live?'<button data-a="lvAddOpen">'+ic('users')+'Laatkomer, invaller of vertrokken</button><button data-a="lvGkOpen">'+ic('edit')+'Keeper wijzigen</button><button data-a="lvClock">'+ic('clock')+'Klok bijstellen</button>':'')+
+      ((g.ev||[]).length?'<button data-a="lvLog">'+ic('undo')+'Verloop van de wissels</button>':'')+
+      (live?'<button data-a="lvEnd">'+ic('check')+'Match afsluiten</button>':'')+
+      (st==='end'?'<button data-a="lvReopen">'+ic('undo')+'Match heropenen</button>':'')+
+      '<button class="danger" data-a="lvReset" data-confirm="Tik nogmaals om alles van deze match te wissen">'+ic('trash')+'Opnieuw beginnen</button>'+
+      '</div>'+acts('','<button class="btn ghost" data-a="closeSheet">Sluiten</button>');},
+  lvAdd:function(){var x=lvCur(),m=x.m,g=x.g;if(!m)return '';var st=gState(g),live=st==='play'||st==='break',inR=new Set(),R=null,ot=m.team==='A'?'B':'A';
+    if(live){R=gStats(g,gNow(g));R.st.forEach(function(s){if(s.inR)inR.add(s.id);});}else gRoster(m,g).forEach(function(id){inR.add(id);});
+    var others=plist().filter(function(p){return !inR.has(p.id)&&p.active!==false&&!p.review;}),gs=guestStats();
+    function grp(t,title){var arr=others.filter(function(p){return p.team===t;}).sort(byOrder);return arr.length?'<h3>'+esc(title)+'</h3><div class="chips">'+arr.map(function(p){return '<button class="bchip" data-a="lvAddP" data-p="'+esc(p.id)+'">'+ic('plus')+esc(p.name)+(t===ot?guestChip(gs,p.id):'')+'</button>';}).join('')+'</div>'+(t===ot?guestHint(gs,arr):''):'';}
+    var h='<h2>'+(live?'Aanwezigen':'Invaller toevoegen')+'</h2><p class="sub">'+esc(matchTitle(m))+'</p>';
+    if(live){var bench=[];R.st.forEach(function(s){if(s.inR&&!s.on)bench.push(s.id);});
+      h+='<h3>Doet niet meer mee</h3>'+(bench.length?'<div class="chips">'+lvSort(m,bench).map(function(id){return '<button class="bchip out" data-a="lvDel" data-p="'+esc(id)+'">'+ic('x')+esc(gName(g,id))+'</button>';}).join('')+'</div>':'')+
+        '<p class="hint">'+(bench.length?'Tik op wie op de bank zit en vertrekt of geblesseerd is. Zijn speeltijd blijft staan. ':'')+'Wie op het veld staat, wissel je eerst.</p><h3 style="margin-top:18px">Laatkomer of invaller</h3><p class="hint" style="margin-top:0">Komt op de bank.</p>';}
+    var body=grp(m.team,teamLabel(m.team))+grp(ot,teamLabel(ot))+grp('X','Extern / reserve');
+    return h+(body||'<p class="hint">Alle gekende spelers zijn er al.</p>')+
+      '<h3>Nieuwe speler</h3><div class="row"><input type="text" id="lv-name" placeholder="Voornaam + initiaal" autocomplete="off" aria-label="Naam"><select id="lv-team" aria-label="Soort speler" style="max-width:48%"><option value="X">Extern (gastspeler)</option><option value="'+m.team+'">Vaste speler '+esc(teamLabel(m.team))+'</option><option value="'+ot+'">Vaste speler '+esc(teamLabel(ot))+'</option></select></div>'+
+      acts('','<button class="btn ghost" data-a="closeSheet">Klaar</button><button class="btn primary" data-a="lvNew">'+ic('plus')+'Toevoegen</button>');},
+  lvGk:function(){var x=lvCur(),m=x.m,g=x.g;if(!g)return '';var R=gStats(g,gNow(g)),f=[];R.st.forEach(function(s){if(s.inR&&s.on)f.push(s.id);});
+    return '<h2>Keeper</h2><p class="sub">Wie staat er nu in doel?</p><div class="wpick">'+lvSort(m,f).map(function(id){return '<button class="wp'+(id===R.gk?' on':'')+'" data-a="lvGkSet" data-p="'+esc(id)+'"><span>'+esc(gName(g,id))+'</span>'+(id===R.gk?'<small>nu</small>':'')+'</button>';}).join('')+'</div>'+
+      '<p class="hint">De keeper krijgt nooit een wisselvoorstel. Wil je de keeper wisselen, tik hem dan zelf aan op het veld.</p>'+
+      acts(R.gk?'<button class="btn ghost spacer" data-a="lvGkSet" data-p="">Geen vaste keeper</button>':'','<button class="btn ghost" data-a="closeSheet">Sluiten</button>');},
+  lvClock:function(){var x=lvCur(),g=x.g;if(!g)return '';var c=g.clock||{};
+    return '<h2>Klok bijstellen</h2><p class="sub">'+esc(perLbl(g,Number(c.p)||1))+(c.state==='play'?'':', klok staat stil')+'</p><div class="lvcbig" id="lvc-time">'+mmss(gNow(g)-(Number(c.ps)||0))+'</div>'+
+      '<div class="lvcadj">'+[-60,-10,10,60].map(function(d){return '<button class="btn" data-a="lvAdj" data-d="'+d+'">'+(d>0?'+':'−')+(Math.abs(d)>=60?(Math.abs(d)/60)+' min':Math.abs(d)+' s')+'</button>';}).join('')+'</div>'+
+      '<p class="hint">Liep je klok niet gelijk met die van de scheidsrechter, bv. omdat je te laat op Start drukte? Zet hem hier bij. De speelminuten van wie nu op het veld staat, schuiven mee.</p>'+
+      acts('','<button class="btn primary" data-a="closeSheet">Klaar</button>');},
+  lvLog:function(){var x=lvCur(),m=x.m,g=x.g;if(!g)return '';var ev=(g.ev||[]).slice(),st=gState(g),can=st==='play'||st==='break';
+    return '<h2>Verloop</h2><p class="sub">'+esc(matchTitle(m))+'</p>'+(ev.length?'<div class="lvlog">'+ev.map(function(e,i){return '<div class="lvle"><span class="tm">'+esc(evWhen(g,e))+'</span><span class="tx">'+esc(evText(g,e))+'</span>'+(can&&i===ev.length-1?'<button class="btn sm ghost" data-a="lvUndo">'+ic('undo')+'Ongedaan maken</button>':'')+'</div>';}).reverse().join('')+'</div>':'<p class="hint">Nog geen wissels.</p>')+
+      acts('','<button class="btn primary" data-a="closeSheet">Sluiten</button>');}
+});
+
+Object.assign(ACT,{
+  live:function(d){openLive(d.id,false);},
+  lvBack:function(){if(history.state&&history.state.lv)history.back();else lvClose();},
+  lvMenu:function(){openSheet('lvMenu');},
+  lvStep:function(d){S.lvStep=d.v;S.lvSel=null;render();window.scrollTo(0,0);},
+  lvPres:function(d){var x=lvCur(),m=x.m,g=x.g;if(!m||gState(g)!=='pre')return;
+    var ab=((g&&g.absent)||[]).slice(),ex=((g&&g.extra)||[]).slice(),inSel=selection(m).indexOf(d.p)>=0,i=ab.indexOf(d.p),patch={};
+    if(i>=0){ab.splice(i,1);patch.absent=ab;}
+    else{if(!inSel&&ex.indexOf(d.p)>=0)patch.extra=ex.filter(function(y){return y!==d.p;});else{ab.push(d.p);patch.absent=ab;}
+      if(g&&(g.lineup||[]).indexOf(d.p)>=0)patch.lineup=g.lineup.filter(function(y){return y!==d.p;});
+      if(g&&g.gk===d.p)patch.gk=null;}
+    gput(m,patch);},
+  lvAddOpen:function(){openSheet('lvAdd');},
+  lvAddP:function(d){var x=lvCur();if(!x.m)return;lvAddPlayer(x.m,x.g,d.p);renderSheet();},
+  lvNew:function(){var x=lvCur(),m=x.m;if(!m)return;var nm=$('#lv-name').value.trim(),tm=$('#lv-team').value;if(!nm){toast('Vul een naam in.');return;}
+    var pid=rid('p'),ord=tm==='X'?null:(plist().filter(function(p){return p.team===tm;}).reduce(function(a,p){return Math.max(a,Number(p.order)||0);},0)+1);
+    if(write('players',pid,'set',{name:nm,team:tm,active:true,order:ord,createdAt:new Date().toISOString()})){lvAddPlayer(m,gameOf(m.id),pid);renderSheet();}},
+  lvDel:function(d){var x=lvCur(),g=x.g;if(!g)return;var R=gStats(g,gNow(g)),s=R.st.get(d.p);if(!s||!s.inR)return;if(s.on){toast('Wissel '+gName(g,d.p)+' eerst.');return;}
+    gwrite(x.m.id,{ev:(g.ev||[]).concat([lvEv(g,{k:'del',id:d.p})])});toast(gName(g,d.p)+' doet niet meer mee. Zijn speeltijd blijft staan.');renderSheet();},
+  lvLine:function(d){var x=lvCur(),m=x.m,g=x.g;if(!m||gState(g)!=='pre')return;
+    var R=gRoster(m,g),n=Math.min(Number(g&&g.n)||defN(m),R.length),L=((g&&g.lineup)||[]).filter(function(id){return R.indexOf(id)>=0;}),i=L.indexOf(d.p),patch={};
+    if(i>=0){L.splice(i,1);if(g&&g.gk===d.p)patch.gk=null;}
+    else{if(L.length>=n){toast('Er staan al '+n+' spelers op het veld. Tik eerst iemand op het veld om hem naar de bank te zetten.');return;}L.push(d.p);}
+    patch.lineup=L;gput(m,patch);},
+  lvN:function(d){var x=lvCur(),m=x.m,g=x.g;if(!m||gState(g)!=='pre')return;
+    var R=gRoster(m,g),cur=Math.min(Number(g&&g.n)||defN(m),R.length),nn=Math.max(4,Math.min(11,R.length,cur+Number(d.d)));
+    var L=((g&&g.lineup)||[]).filter(function(id){return R.indexOf(id)>=0;}),gk=g&&g.gk;while(L.length>nn){var k=L.length-1;if(L[k]===gk&&k>0)k--;L.splice(k,1);}
+    gput(m,{n:nn,lineup:L});},
+  lvPerSet:function(d){var x=lvCur();if(!x.m||gState(x.g)!=='pre')return;gput(x.m,{per:Number(d.v)});},
+  lvSuggest:function(){var x=lvCur(),m=x.m,g=x.g;if(!m||gState(g)!=='pre')return;var R=gRoster(m,g),n=Math.min(Number(g&&g.n)||defN(m),R.length);
+    gput(m,{lineup:lineupSuggest(m,g,R,n)});toast('Wie vorige keer op de bank begon, start nu. Pas gerust aan.');},
+  lvKick:function(){var x=lvCur(),m=x.m,g=x.g;if(!m||gState(g)!=='pre')return;
+    var R=gRoster(m,g),n=Math.min(Number(g&&g.n)||defN(m),R.length),L=((g&&g.lineup)||[]).filter(function(id){return R.indexOf(id)>=0;});
+    if(!n||L.length!==n){toast(L.length<n?'Kies nog '+(n-L.length)+' speler'+(n-L.length>1?'s':'')+' voor het veld.':'Er staan te veel spelers op het veld.');return;}
+    var names={};R.forEach(function(id){names[id]=pName(id);});
+    gput(m,{present:R,lineup:L,n:n,per:Number(g&&g.per)||defPer(m),gk:(g&&g.gk&&L.indexOf(g.gk)>=0)?g.gk:null,names:names,ev:[],clock:{state:'play',p:1,acc:0,since:Date.now(),ps:0},startedAt:new Date().toISOString(),endedAt:null});
+    S.lvSel=null;S.lvStep=null;WLX=false;wakeSync();window.scrollTo(0,0);toast('Aftrap. De klok loopt.');},
+  lvPer:function(){var x=lvCur(),m=x.m,g=x.g;if(!g)return;var c=Object.assign({},g.clock||{}),p=Number(c.p)||1,per=Number(g.per)||4;
+    if(c.state==='play'){c.acc=Math.round(gNow(g));c.since=null;S.lvSel=null;
+      if(p>=per){c.state='end';gwrite(m.id,{clock:c,endedAt:new Date().toISOString()});window.scrollTo(0,0);toast('Match afgelopen. Hier zie je de speeltijd per speler.');}
+      else{c.state='break';gwrite(m.id,{clock:c});toast('Einde '+perLbl(g,p)+'. De klok staat stil.');}}
+    else if(c.state==='break'){c.state='play';c.p=p+1;c.since=Date.now();c.ps=Number(c.acc)||0;gwrite(m.id,{clock:c});WLX=false;wakeSync();toast(perLbl(g,p+1)+': de klok loopt.');}},
+  lvTap:function(d){var x=lvCur(),m=x.m,g=x.g;if(!g)return;var st=gState(g);if(st!=='play'&&st!=='break')return;
+    var R=gStats(g,gNow(g)),s=R.st.get(d.p);if(!s||!s.inR)return;
+    if(S.lvSel===d.p){S.lvSel=null;render();return;}
+    var cur=S.lvSel?R.st.get(S.lvSel):null;
+    if(cur&&cur.inR&&cur.on!==s.on){lvDoSub(m,g,s.on?d.p:S.lvSel,s.on?S.lvSel:d.p);return;}
+    S.lvSel=d.p;render();},
+  lvSub:function(d){var x=lvCur();if(!x.g)return;lvDoSub(x.m,x.g,d.o,d.i);},
+  lvCancel:function(){S.lvSel=null;render();},
+  lvUndo:function(){lvUndoLast();},
+  lvGkOpen:function(){openSheet('lvGk');},
+  lvGkSet:function(d){var x=lvCur(),g=x.g;if(!g)return;var st=gState(g);if(st!=='play'&&st!=='break')return;
+    gwrite(x.m.id,{ev:(g.ev||[]).concat([lvEv(g,{k:'gk',id:d.p||null})])});closeSheet();toast(d.p?gName(g,d.p)+' staat in doel.':'Geen vaste keeper meer.');},
+  lvClock:function(){openSheet('lvClock');},
+  lvAdj:function(d){var x=lvCur(),g=x.g;if(!g)return;var c=Object.assign({},g.clock||{}),T=Math.max(Number(c.ps)||0,gNow(g)+Number(d.d));c.acc=Math.round(T);if(c.state==='play')c.since=Date.now();gwrite(x.m.id,{clock:c});renderSheet();},
+  lvLog:function(){openSheet('lvLog');},
+  lvEnd:function(){var x=lvCur(),g=x.g;if(!g)return;var c=Object.assign({},g.clock||{});c.acc=Math.round(gNow(g));c.since=null;c.state='end';gwrite(x.m.id,{clock:c,endedAt:new Date().toISOString()});S.lvSel=null;closeSheet();window.scrollTo(0,0);},
+  lvReopen:function(){var x=lvCur(),g=x.g;if(!g)return;var c=Object.assign({},g.clock||{});c.state='break';c.since=null;gwrite(x.m.id,{clock:c,endedAt:null});if(S.sheet)closeSheet();toast('Match heropend. De klok staat stil.');},
+  lvReset:function(){var x=lvCur();if(!x.m)return;gdelete(x.m.id);S.lvSel=null;S.lvStep=null;closeSheet();toast('Alles van deze match is gewist.');}
+});
+Object.assign(CH,{
+  lvAll:function(el){saveCfg('live.all',el.checked);toast(el.checked?'Alle trainers zien nu de knop Wissels.':'Enkel de eigenaar ziet nog de knop Wissels.');},
+  lvGkPre:function(el){var x=lvCur();if(!x.m||gState(x.g)!=='pre')return;gput(x.m,{gk:el.value||null});}
+});
+
 document.addEventListener('click',function(e){
   var b=e.target.closest('[data-a]');if(!b||b.disabled)return;var fn=ACT[b.dataset.a];if(!fn)return;e.preventDefault();
   if(b.dataset.confirm&&!b.dataset.armed){b.dataset.armed='1';var lbl=b.innerHTML;b.textContent=b.dataset.confirm;setTimeout(function(){if(b.isConnected){delete b.dataset.armed;b.innerHTML=lbl;}},4000);return;}
@@ -1005,7 +1355,7 @@ function boot(){
   DB=makeDB(FS);
   if(AUTH.isSignInWithEmailLink(location.href)){var em='';try{em=localStorage.getItem('hu11.email')||'';}catch(e){}finishLink(em,location.href);}
   AUTH.onAuthStateChanged(function(u){
-    if(!u){S.user=null;S.admin=false;S.owner=false;S.week=null;stopSubs();S.config=null;CFG=null;['players','opponents','matches','weeks','members'].forEach(function(c){S[c]=new Map();});S.db='login';render();return;}
+    if(!u){S.user=null;S.admin=false;S.owner=false;S.week=null;stopSubs();S.config=null;CFG=null;['players','opponents','matches','weeks','members','games'].forEach(function(c){S[c]=new Map();});if(S.view==='live')S.view='week';S.liveId=null;S.db='login';render();return;}
     S.user={uid:u.uid,email:String(u.email||'').toLowerCase()};S.admin=false;S.owner=false;S.retried=false;S.db='wait';render();
     u.getIdToken().then(subscribe,subscribe);
     if(/[?&](oobCode|apiKey)=/.test(location.search))history.replaceState(null,'',location.pathname);

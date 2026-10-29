@@ -1,6 +1,6 @@
 # Hechtel U11 Planner
 
-Webapp om de wekelijkse wedstrijdschema's van K. Hechtel FC U11 A en B te maken: selectie, verzameluur, was en broodjes, trainers, export als JPEG en PDF. Werkt op gsm en computer.
+Webapp om de wekelijkse wedstrijdschema's van K. Hechtel FC U11 A en B te maken: selectie, verzameluur, was en broodjes, trainers, export als JPEG en PDF. Tijdens de match houden de trainers er de wissels en de speeltijd mee bij. Werkt op gsm en computer.
 
 ## Hoe het werkt
 
@@ -36,7 +36,8 @@ Voor de trainers is er een korte handleiding met screenshots: `handleiding.html`
 
 - **Speeldag:** de matchen van één week. Tik op een speler om hem uit de selectie te halen, op het shirtje voor was + broodjes, op het verzameluur om het aan te passen. Exporteer als JPEG of PDF, of deel meteen via WhatsApp.
 - **Kalender:** alle weken onder elkaar. Vink meerdere speeldagen aan om ze samen te exporteren.
-- **Spelers:** de ploeglijsten van A en B zijn het sjabloon voor elke nieuwe match. Verhuis spelers tussen A en B, voeg externe spelers toe, zet iemand inactief.
+- **Spelers:** de ploeglijsten van A en B zijn het sjabloon voor elke nieuwe match. Verhuis spelers tussen A en B, voeg externe spelers toe, zet iemand inactief. Een blauw label ("2× bij B") toont hoe vaak een speler dit seizoen met de andere ploeg meespeelde, met bovenaan het totaal per ploeg.
+- **Wissels:** de knop op de matchkaart opent de wisseltool: wie is er, basisopstelling, en tijdens de match per speler de speelminuten en hoe vaak hij op de bank zat, met een voorstel voor de eerlijkste volgende wissel. Uitleg met screenshots: `wissels.html`. De eigenaar zet de knop aan voor alle trainers bij Meer > Wissels tijdens de match.
 - **Meer:** tegenstanders en rijtijden, verzamelregels, trainers, speeldagnummering, RBFA-ploegen, toegang en back-up.
 
 Was + broodjes: de planner stelt per ploeg per week iemand voor, op basis van wie het dit seizoen het minst en het langst geleden deed. Bij het delen of downloaden van het schema wordt het voorstel vastgelegd.
@@ -66,6 +67,7 @@ Meer > Back-up > Back-up downloaden geeft een JSON-bestand met alle gegevens. Me
 - `config.js`: Firebase-instellingen.
 - `firestore.rules`: beveiligingsregels (sjabloon).
 - `handleiding.html` en `hl-*.png`: handleiding voor de trainers, met screenshots uit een testomgeving met fictieve namen.
+- `wissels.html` en `ws-*.png`: uitleg over de wisseltool, ook met fictieve namen.
 - `firebase-*-compat.js` en `jspdf.umd.min.js`: Firebase JS SDK 10.12.2 (compat) en jsPDF 2.5.1, zelf gehost.
-- Collecties in Firestore: `config/main`, `players`, `opponents`, `matches`, `weeks` (titel en exportdatum per week, sleutel = maandag), `members` (sleutel = e-mailadres, `role`: `trainer` of `admin`).
+- Collecties in Firestore: `config/main`, `players`, `opponents`, `matches`, `weeks` (titel en exportdatum per week, sleutel = maandag), `members` (sleutel = e-mailadres, `role`: `trainer` of `admin`), `games` (wissels per match, sleutel = match-id: aanwezigen, basisopstelling, klok en een lijst gebeurtenissen met de matchtijd in seconden; speelminuten worden daaruit berekend).
 - RBFA: GraphQL op `datalake-prod2018.rbfa.be` (clubTeams, teamCalendar, matchDetail, teamMembers). Club 1416, stamnummer 02662.

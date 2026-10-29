@@ -334,3 +334,105 @@ textarea{padding:8px 10px;resize:vertical}
 label.btn{cursor:pointer}
 @media (prefers-reduced-motion:reduce){.i-spin{animation:none}}
 @media (max-width:760px){.sheet-actions #exp-share{order:-1;flex:1 1 100%;min-height:46px}}
+
+/* wissels tijdens de match: knop op de matchkaart, stappen voor de aftrap, live scherm, speeltijd */
+.mfrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lvbtn{margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--sheet);font-weight:600;white-space:nowrap}
+.lvbtn .i{width:17px;height:17px}
+.lvbtn.live{background:var(--green);border-color:var(--green);color:var(--sheet)}
+.lvbtn.paused{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.lv{max-width:720px;margin:0 auto}
+.lvhead{display:flex;align-items:center;gap:8px;padding-block:12px 10px}
+.lvhead .lvt{flex:1;min-width:0}
+.lvhead h1{margin:0;font:700 24px/1.05 var(--f-display);text-transform:uppercase;letter-spacing:.01em;text-wrap:balance}
+.lvhead h1 .hc{color:var(--red)}
+.lvhead p{margin:3px 0 0;color:var(--muted);font-size:13.5px}
+.lvstep{display:flex;gap:10px;align-items:flex-start;margin:2px 0 8px}
+.lvstep .no{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--sheet);font:700 16px/1 var(--f-display);flex:none;margin-top:1px}
+.lvstep h2{margin:0;font:700 22px/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.01em}
+.lvstep p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.lv .sellbl{margin-top:12px}
+.lvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px}
+.lvempty{grid-column:1 / -1;margin:2px 0}
+.lvr{display:flex;align-items:center;gap:8px;min-height:48px;padding:0 10px;border:1.5px solid var(--green);background:var(--green-bg);border-radius:10px;font-weight:600;text-align:left;min-width:0;color:var(--ink)}
+.lvr .i{color:var(--green);width:18px;height:18px}
+.lvr .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lvr small{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.lvr.off{border-color:var(--line);background:var(--sheet);color:var(--muted)}
+.lvr.off .n{text-decoration:line-through}
+.lvr.off .i{color:var(--muted)}
+.lvact{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.lvact .btn{min-height:48px}
+.lvact .grow{flex:1 1 180px}
+.lvcfg{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--sheet);min-height:42px}
+.stepper button{width:42px;height:40px;border:0;background:none;font:700 20px/1 var(--f-body)}
+.stepper b{min-width:22px;text-align:center;font:700 22px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.stepper span{padding:0 12px 0 4px;color:var(--muted);font-size:13.5px;font-weight:600}
+.lvcfg .seg{flex:1 1 190px}
+.lvgk{margin:12px 0 0}
+.lvgk select{max-width:320px}
+.lt{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:1px 8px;min-height:54px;padding:6px 10px;border:1.5px solid var(--line);border-radius:10px;background:var(--sheet);text-align:left;width:100%;min-width:0;color:var(--ink)}
+.lt .n{display:block;font-weight:700;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lt .m{grid-column:2;grid-row:1 / span 2;font:700 26px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.lt .s{grid-column:1;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:15px}
+.lt.bench{background:var(--sheet2);border-style:dashed}
+.lt.sg-in{border:2px dashed var(--green);background:var(--green-bg)}
+.lt.sg-out{border:2px dashed var(--warn);background:var(--warn-bg)}
+.lt.sel{border:2px solid var(--ink);background:var(--ink);color:var(--sheet)}
+.lt.sel .s{color:inherit;opacity:.8}
+.lt:active{transform:scale(.985)}
+.kp{display:inline-grid;place-items:center;width:19px;height:19px;margin-left:6px;border-radius:5px;background:var(--info);color:var(--sheet);font:700 12.5px/1 var(--f-display);font-style:normal;vertical-align:2px}
+.lvclock{display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--sheet);border-radius:12px;padding:8px 8px 8px 14px;margin:2px 0 8px}
+.lvclock .ck{display:grid;gap:2px;border:0;background:none;color:inherit;padding:0;text-align:left}
+.lvclock .ck small{font:600 12px/1.1 var(--f-body);text-transform:uppercase;letter-spacing:.07em;opacity:.78}
+.lvclock .ck span{font:700 36px/1 var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.lvclock .lvper{margin-left:auto;min-height:46px;background:var(--sheet);color:var(--ink);border-color:var(--sheet)}
+.lvclock .lvper.ok{background:var(--green);border-color:var(--green);color:var(--sheet)}
+.lvclock.paused{background:var(--sheet2);color:var(--ink);border:1.5px solid var(--line)}
+.lvclock.done{background:var(--green-bg);color:var(--ink);border:1.5px solid var(--green)}
+.lvclock .avg{margin-left:auto;font-size:14px;color:var(--muted);text-align:right}
+.lvclock .avg b{color:var(--ink)}
+.lvsug{display:flex;align-items:center;gap:10px;border:1.5px dashed var(--green);background:var(--green-bg);border-radius:10px;padding:6px 8px 6px 12px;min-height:54px}
+.lvsug>.i{color:var(--green)}
+.lvsug .tx{flex:1;min-width:0;font-size:14.5px;line-height:1.3}
+.lvsug .tx b.in{color:var(--green)}
+.lvsug .tx b.out{color:var(--warn)}
+.lvsug .btn{min-height:42px}
+.lvsug.idle{border:1px solid var(--line2);background:var(--sheet);color:var(--muted)}
+.lvsug.idle>.i{color:var(--muted)}
+.lvsug.pick{border:2px solid var(--ink);background:var(--sheet)}
+.lvsug.pick>.i{color:var(--ink)}
+.lvlast{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-top:14px;padding:6px 6px 6px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--sheet);font-size:14px;color:var(--muted)}
+.lvlast>span{display:flex;align-items:center;gap:8px;min-width:0}
+.lvlast>span>span{line-height:1.3}
+.lvlast .btn{min-height:40px;flex:none}
+.lvsum{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:6px;margin-top:6px}
+.lvs{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:8px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--sheet)}
+.lvs .n{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvs .m{grid-column:2;grid-row:1 / span 3;font:700 26px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.lvs .bar{display:block;height:7px;border-radius:4px;background:var(--line2);overflow:hidden}
+.lvs .bar i{display:block;height:100%;background:var(--green);border-radius:4px}
+.lvs .s{font-size:12.5px;color:var(--muted)}
+.lvs.lo .bar i{background:var(--warn)}
+.lvs.lo .m{color:var(--warn)}
+.lvcbig{font:700 58px/1 var(--f-display);text-align:center;font-variant-numeric:tabular-nums;margin:6px 0 14px}
+.lvcadj{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.lvcadj .btn{min-height:50px;font-size:16px;padding:0 6px}
+.lvle{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line2)}
+.lvle .tm{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;min-width:108px}
+.lvle .tx{flex:1;min-width:0;font-weight:600}
+.menu button.danger{color:var(--bad)}
+.bchip.out{border-style:solid;color:var(--ink)}
+.bchip.out .i{color:var(--bad)}
+@media (max-width:760px){
+  #app.lvmode .top{display:none}
+  #app.lvmode main{padding-bottom:28px}
+  #app.lvmode .toast{bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+  #app.lvmode .lvclock:not(.done){position:sticky;top:calc(6px + env(safe-area-inset-top,0px));z-index:6;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  .lvhead h1{font-size:22px}
+}
+/* meegespeeld met de andere ploeg: teller per kind en per ploeg */
+.ogx{font-size:12px;font-weight:700;color:var(--info);background:var(--info-bg);border-radius:6px;padding:3px 7px;white-space:nowrap;flex:none}
+.gxt{font-size:12.5px;font-weight:700;color:var(--info);white-space:nowrap}
+.bchip .gxc{font-size:11px;font-weight:700;color:var(--info);background:var(--info-bg);border-radius:5px;padding:1px 5px;margin-left:3px}
