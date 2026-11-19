@@ -246,6 +246,7 @@ textarea{padding:8px 10px;resize:vertical}
 .hist th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-top:0}
 .hist td.g{color:var(--green);font-weight:600}
 .histwrap{overflow-x:auto;max-height:420px;overflow-y:auto}
+.hist td small.hd{color:var(--muted);font-weight:500;font-size:12px;margin-left:2px}
 .phases{display:grid;gap:8px}
 .phase{display:flex;gap:8px;align-items:center}
 .phase input{max-width:200px}

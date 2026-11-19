@@ -231,13 +231,15 @@ function rbfaDiff(snap,season){
   newOpp.forEach(function(n,oid){var tv=(n.venue&&travelFor(snap,n.venue,n.club))||{},d={name:n.name,source:'rbfa',rbfaClubId:n.club,travelMin:tv.min!=null?tv.min:null};if(n.venue)d.venue=n.venue;if(tv.routeMin!=null){d.routeMin=tv.routeMin;d.km=tv.km==null?null:tv.km;}
     var info=n.venue?(n.venue.city+(tv.min!=null?', '+tv.min+' min rijden':', rijtijd nog invullen')):'thuismatch, geen terrein nodig';
     add(G.opp,{key:'opp:'+oid,label:'Nieuwe tegenstander: '+n.name+' ('+info+')',short:n.name+' ('+info+')',writes:[['opponents',oid,'set',d]]});});
-  var inSnap=new Set(),byR=new Set();plist().forEach(function(p){if(p.rbfaId)byR.add(String(p.rbfaId));});
-  var cand=new Map(),fresh=!plist().length;['A','B'].forEach(function(team){((snap.players||{})[team]||[]).forEach(function(r){var rid=String(r[0]),nm=String(r[1]||'').trim();if(!rid)return;inSnap.add(rid);if(!nm||byR.has(rid))return;var x=cand.get(rid)||{name:nm,cnt:{}};x.cnt[team]=Number(r[2])||0;cand.set(rid,x);});});
-  cand.forEach(function(x,rid){var a=x.cnt.A,b=x.cnt.B,team=(a!=null&&(b==null||a>b))?'A':'B';
-    var same=plist().filter(function(p){return !p.rbfaId&&norm(p.name)===norm(x.name);});
-    if(same.length===1){add(G.other,{key:'link:'+rid,label:'Koppel '+same[0].name+' aan de RBFA-spelerslijst',writes:[['players',same[0].id,'update',{rbfaId:rid}]]});return;}
-    add(G.player,{key:'player:'+rid,label:'Nieuwe speler in RBFA: '+x.name+' (speelde bij '+teamLabel(team)+')',short:x.name+' ('+team+')',writes:[['players','p-'+slug(x.name)+'-'+rid,'set',{name:x.name,team:team,active:true,order:99,rbfaId:rid,review:!fresh,suggestTeam:team}]]});});
-  if(season&&inSnap.size){plist().forEach(function(p){if(p.rbfaId&&!inSnap.has(String(p.rbfaId))&&p.active!==false&&p.team!=='X')G.gone.push({key:'gone:'+p.id+':'+snap.teams.A.id,short:p.name,writes:[['players',p.id,'update',{active:false}]]});});}
+  var inSnap=new Set(),byKey=new Map(),present=new Set(),links=[],todo=[];plist().forEach(function(p){if(p.rbfaKey)byKey.set(String(p.rbfaKey),p);});
+  var cand=new Map(),fresh=!plist().length;['A','B'].forEach(function(team){((snap.players||{})[team]||[]).forEach(function(r){var key=String(r[0]||''),nm=String(r[1]||'').trim();if(!key||!nm)return;inSnap.add(key);var x=cand.get(key)||{key:key,name:nm,f1:r[3]||'',ff:r[4]||'',ln:r[5]||'',cnt:{}};x.cnt[team]=Number(r[2])||0;cand.set(key,x);});});
+  cand.forEach(function(x){var p=byKey.get(x.key);if(p)present.add(p.id);else todo.push(x);});
+  var pairs=[],done=new Set();
+  todo.forEach(function(x){plist().forEach(function(p){if(p.rbfaKey||present.has(p.id))return;var sc=nameScore(p.name,x);if(sc>=0)pairs.push({x:x,p:p,sc:sc});});});
+  pairs.sort(function(a,b){return b.sc-a.sc;}).forEach(function(pr){if(done.has(pr.x.key)||present.has(pr.p.id))return;done.add(pr.x.key);present.add(pr.p.id);links.push(['players',pr.p.id,'update',{rbfaKey:pr.x.key}]);});
+  todo.forEach(function(x){if(done.has(x.key))return;var a=x.cnt.A,b=x.cnt.B,team=(a!=null&&(b==null||a>b))?'A':'B';
+    add(G.player,{key:'player:'+x.key,label:'Nieuwe speler in RBFA: '+x.name+' (speelde bij '+teamLabel(team)+')',short:x.name+' ('+team+')',writes:[['players','p-'+slug(x.name)+'-'+x.key,'set',{name:x.name,team:team,active:true,order:99,rbfaKey:x.key,review:!fresh,suggestTeam:team}]]});});
+  if(season&&snap.playersOk&&inSnap.size){plist().forEach(function(p){if((p.rbfaKey||p.rbfaId)&&!present.has(p.id)&&p.active!==false&&p.team!=='X')G.gone.push({key:'gone:'+p.id+':'+snap.teams.A.id,short:p.name,writes:[['players',p.id,'update',{active:false}]]});});}
   var head=[];Object.keys(firstOf).forEach(function(s){var f=firstOf[s];add(head,{key:'series:'+s,series:s,date:f.date,team:f.team,label:'Nieuwe reeks voor '+teamLabel(f.team)+': '+s+'. Speeldag 1 wordt de week van '+dayMonth(mondayOf(f.date)),writes:[]});});
   function group(list,max,label){if(list.length<=max)return list;var ds=list.map(function(i){return i.date;}).filter(Boolean).sort();
     return [{key:list[0].key,keys:list.map(function(i){return i.key;}),label:label(list,ds),sub:list.map(function(i){return i.short||i.label;}),writes:[].concat.apply([],list.map(function(i){return i.writes;}))}];}
@@ -248,6 +250,7 @@ function rbfaDiff(snap,season){
     G.other,
     group(G.rem,3,function(l){return l.length+' matchen staan niet meer in de RBFA-kalender en krijgen een waarschuwing';}),
     group(G.player,3,function(l){return l.length+' nieuwe spelers in RBFA'+(fresh?', ingedeeld bij de ploeg waar ze het meest speelden':' (kies daarna hun ploeg bij Spelers)');}));
+  if(links.length)out.push({key:'links',silent:true,writes:links});
   if(G.gone.length)out.push({key:G.gone[0].key,keys:G.gone.map(function(i){return i.key;}),label:'Niet meer bij '+snap.teams.A.name+' of '+snap.teams.B.name+' in RBFA, worden inactief (de historiek blijft):',sub:G.gone.map(function(i){return i.short;}),writes:[].concat.apply([],G.gone.map(function(i){return i.writes;}))});
   return out;
 }
@@ -259,18 +262,31 @@ function applyRbfa(items,snap,season,gone){
     if(it.series){sc=true;if(known.indexOf(it.series)<0)known.push(it.series);series[it.team]=it.series;var mon=mondayOf(it.date);if(!phases.some(function(p){return mondayOf(p)===mon;}))phases.push(it.date);}
   });
   var patch={rbfa:{lastSync:now,syncAt:0,clubId:String(snap.clubId),teamA:String(snap.teams.A.id),teamB:String(snap.teams.B.id),teamNames:{A:snap.teams.A.name,B:snap.teams.B.name}}};
-  if(items.length){patch.rbfa.lastChanges=items.slice(0,40).map(function(i){return {l:i.label,s:(i.sub||[]).slice(0,30)};});patch.rbfa.lastChangesAt=now;}
+  var vis=items.filter(function(i){return !i.silent;});
+  if(vis.length){patch.rbfa.lastChanges=vis.slice(0,40).map(function(i){return {l:i.label,s:(i.sub||[]).slice(0,30)};});patch.rbfa.lastChangesAt=now;}
   if(season&&gone&&gone.length)patch.rbfa.seasonNotice={at:now,teams:{A:snap.teams.A.name,B:snap.teams.B.name},gone:gone};
   if(sc){patch.rbfa.seriesKnown=known;patch.rbfa.series=series;patch.phases=phases.sort();}
   if(S.config)write('config','main','update',patch);else write('config','main','set',merge(DEFAULT_CONFIG,patch));
 }
 var GQ_URL='https://datalake-prod2018.rbfa.be/graphql';
 var Q_TEAMS='query($clubId:ID!,$language:Language!){clubTeams(clubId:$clubId,language:$language){id name}}';
-var Q_CAL='query($teamId:ID!,$language:Language!,$sortByDate:SortDirection){teamCalendar(teamId:$teamId,language:$language,sortByDate:$sortByDate){id startTime state homeTeam{name clubId}awayTeam{name clubId}series{name}}}';
-var Q_DET='query($matchId:ID!,$language:Language!){matchDetail(matchId:$matchId,language:$language){eventType state location{name address postalCode city}}}';
-var Q_MEM='query($teamId:ID!,$language:Language!){teamMembers(teamId:$teamId,language:$language){players{id firstName lastName statistics{numberOfMatches}}}}';
+var Q_CAL='query($teamId:ID!,$language:Language!,$sortByDate:SortDirection){teamCalendar(teamId:$teamId,language:$language,sortByDate:$sortByDate){id startTime state homeTeam{name clubId}awayTeam{name clubId}series{id name}}}';
+var Q_DET='query($matchId:ID!,$language:Language!){matchDetail(matchId:$matchId,language:$language){state location{name address postalCode city}}}';
+/* RBFA dropped matchDetail.eventType in November 2026. The type now follows from the series id
+   (FRN_… for friendlies, CHP_… for championships), with the series name as a fallback. */
+function kindOfSeries(sr){sr=sr||{};var p=String(sr.id||'').toUpperCase().split('_')[0],s=String(sr.name||'').toLowerCase().trim();
+  if(/beker|cup|coupe|pokal|\bbvl\b/.test(s)||/^(CUP|BEK|CPE)/.test(p))return 'cup';
+  if(p==='FRN'||/^(TRN|TOR|TOU)/.test(p))return 'friendly';
+  if(p==='CHP')return 'championship';
+  if(!s||/vriend|oefen|friendly|amical|toernooi|tornooi|tournoi|^[uo] ?\d+$/.test(s))return 'friendly';
+  return /provinc|gewest|region|nation|divis|reeks|liga|league|competit|kampioen|champion/.test(s)?'championship':'friendly';}
+/* RBFA dropped the player id in November 2026: players are recognised by name (only a hash of the full name is stored) */
+var Q_MEM='query($teamId:ID!,$language:Language!){teamMembers(teamId:$teamId,language:$language){players{firstName lastName statistics{numberOfMatches}}}}';
+function nameToks(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/\s+/).map(function(t){return t.replace(/[^a-z0-9]/g,'');}).filter(Boolean);}
+function fold(s){return nameToks(s).join('');}
+function nameScore(pname,x){var t=nameToks(pname);if(!t.length||(t[0]!==x.f1&&t[0]!==x.ff))return -1;var rest=t.slice(1).join('');if(!rest)return 0;return x.ln.indexOf(rest)===0?rest.length:-1;}
 var CLUBTEAMS=null,SYNC_EVERY=20*60e3;
-function gq(query,variables){return fetch(GQ_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:query,variables:variables})}).then(function(r){if(!r.ok)throw new Error('RBFA antwoordt niet ('+r.status+')');return r.json();}).then(function(j){if(j.errors&&j.errors.length)throw new Error(j.errors[0].message);return j.data;});}
+function gq(query,variables){return fetch(GQ_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:query,variables:variables})}).then(function(r){if(!r.ok)throw new Error('RBFA antwoordt niet ('+r.status+')');return r.json();}).then(function(j){if(j.errors&&j.errors.length){var e=new Error(j.errors[0].message);if(/Cannot query field|Unknown argument|Unknown type|must have a selection/i.test(e.message))e.code='schema';throw e;}return j.data;});}
 function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
 function clubTeams(){var r=cfg().rbfa||{};return gq(Q_TEAMS,{clubId:String(r.clubId||'1416'),language:'nl'}).then(function(d){CLUBTEAMS=(d.clubTeams||[]).map(function(t){return {id:String(t.id),name:String(t.name)};});return CLUBTEAMS;});}
 function findTeam(list,name){var n=String(name||'').trim().toLowerCase();for(var i=0;i<list.length;i++){if(list[i].name.trim().toLowerCase()===n)return list[i];}return null;}
@@ -280,22 +296,28 @@ async function rbfaFetch(){
   var tA=findTeam(teams,tn.A),tB=findTeam(teams,tn.B);
   if(!tA||!tB){var e=new Error('Ploeg '+(!tA?tn.A:tn.B)+' niet gevonden bij RBFA. Kies de juiste ploeg bij Meer, RBFA.');e.code='team';throw e;}
   var snap={app:'hechtel-u11',v:2,fetchedAt:new Date().toISOString(),clubId:club,teams:{A:{id:tA.id,name:tA.name},B:{id:tB.id,name:tB.name}},matches:[],players:{},travel:{}};
-  var recent=addDays(today(),-7);
+  var recent=addDays(today(),-7),detailErr=null,memErr=null;
   for(const pair of [['A',tA],['B',tB]]){
     var k=pair[0],team=pair[1];
     var cal=(await gq(Q_CAL,{teamId:team.id,language:'nl',sortByDate:'asc'})).teamCalendar||[];
     for(const m of cal){
       var start=String(m.startTime||''),ex=S.matches.get('rbfa-'+m.id),v=(ex&&ex.venue)||{};
-      var row=[k,String(m.id),start,(m.homeTeam&&m.homeTeam.name)||'',String((m.homeTeam&&m.homeTeam.clubId)||''),(m.awayTeam&&m.awayTeam.name)||'',String((m.awayTeam&&m.awayTeam.clubId)||''),(m.series&&m.series.name)||'',ex?(ex.kind==='oefen'?'friendly':ex.kind==='beker'?'cup':'championship'):'',m.state||'',v.name||'',v.address||'',v.postalCode||'',v.city||''];
-      if(!ex||start.slice(0,10)>=recent){
-        var d=(await gq(Q_DET,{matchId:String(m.id),language:'nl'})).matchDetail||{},l=d.location||{};
-        row[8]=d.eventType||row[8];row[9]=d.state||row[9];row[10]=l.name||'';row[11]=l.address||'';row[12]=l.postalCode||'';row[13]=l.city||'';
+      var row=[k,String(m.id),start,(m.homeTeam&&m.homeTeam.name)||'',String((m.homeTeam&&m.homeTeam.clubId)||''),(m.awayTeam&&m.awayTeam.name)||'',String((m.awayTeam&&m.awayTeam.clubId)||''),(m.series&&m.series.name)||'',ex?(ex.kind==='oefen'||ex.kind==='tornooi'?'friendly':ex.kind==='beker'?'cup':'championship'):kindOfSeries(m.series),m.state||'',v.name||'',v.address||'',v.postalCode||'',v.city||''];
+      if((!ex||start.slice(0,10)>=recent)&&!detailErr){
+        try{var d=(await gq(Q_DET,{matchId:String(m.id),language:'nl'})).matchDetail||{},l=d.location||{};
+          row[9]=d.state||row[9];row[10]=l.name||'';row[11]=l.address||'';row[12]=l.postalCode||'';row[13]=l.city||'';}
+        catch(e){detailErr=e;}
       }
       snap.matches.push(row);
     }
-    var mem=((await gq(Q_MEM,{teamId:team.id,language:'nl'})).teamMembers||{}).players||[];
-    snap.players[k]=mem.map(function(p){return [String(p.id),(String(p.firstName||'').trim().split(/\s+/)[0]+' '+String(p.lastName||'').trim().charAt(0).toUpperCase()).trim(),(p.statistics&&p.statistics.numberOfMatches)||0];});
+    if(memErr)continue;
+    try{var mem=((await gq(Q_MEM,{teamId:team.id,language:'nl'})).teamMembers||{}).players||[];
+      snap.players[k]=mem.map(function(p){var fn=String(p.firstName||'').trim(),ln=String(p.lastName||'').trim(),f1=fn.split(/\s+/)[0]||'';
+        return ['h'+hash(fold(fn)+'|'+fold(ln)).toString(36),(f1+' '+ln.charAt(0).toUpperCase()).trim(),(p.statistics&&p.statistics.numberOfMatches)||0,fold(f1),fold(fn),fold(ln)];});}
+    catch(e){memErr=e;}
   }
+  snap.playersOk=!memErr&&!!snap.players.A&&!!snap.players.B;
+  if(detailErr||memErr){snap.warn=(detailErr&&memErr?'Terreinen en spelerslijsten konden':detailErr?'Terreinen konden':'Spelerslijsten konden')+' niet bij RBFA opgehaald worden. De kalender is wel bijgewerkt.';snap.warnTech=[detailErr,memErr].filter(Boolean).map(function(e){return e.message;}).join(' / ');}
   await addTravel(snap);
   return snap;
 }
@@ -341,13 +363,14 @@ async function syncRbfa(manual){
     var season=teamsDiffer(snap),items=rbfaDiff(snap,season),gone=[],auto=[];
     items.forEach(function(it){if(String(it.key).indexOf('gone:')===0)gone=gone.concat(it.writes.map(function(w){return w[1];}));else auto.push(it);});
     applyRbfa(auto,snap,season,gone);
-    S.sync={busy:false,err:null,n:auto.length};
-    if(auto.length)toast('RBFA: '+auto.length+(auto.length>1?' wijzigingen':' wijziging')+' verwerkt.',function(){openSheet('changes');},'Bekijk');
+    var nv=auto.filter(function(i){return !i.silent;}).length;
+    S.sync={busy:false,err:null,n:nv,warn:snap.warn||null,warnTech:snap.warnTech||null};
+    if(nv)toast('RBFA: '+nv+(nv>1?' wijzigingen':' wijziging')+' verwerkt.',function(){openSheet('changes');},'Bekijk');
     else if(manual)toast('RBFA nagekeken: alles klopt.');
   }catch(e){
     S.sync={busy:false,err:(e&&e.message)||String(e),code:e&&e.code};
     saveCfg('rbfa.syncAt',0);
-    if(manual)toast('RBFA nakijken lukt niet: '+S.sync.err);
+    if(manual)toast(S.sync.code==='schema'?'RBFA heeft iets aan zijn gegevens veranderd, waardoor de kalender nu niet bijgewerkt kan worden. De planner werkt gewoon verder. Laat het de beheerder weten.':'RBFA nakijken lukt niet: '+S.sync.err);
   }
   render();
 }
@@ -355,6 +378,7 @@ function syncChip(){
   var r=cfg().rbfa||{};
   if(S.sync.busy)return '<span class="flag mute">'+ic('spin')+'RBFA-kalender nakijken…</span>';
   if(S.sync.err&&S.sync.code==='team')return '<button class="flag bad" data-a="nav" data-v="more">'+ic('alert')+esc(S.sync.err.split('. ')[0])+': <u>kies de ploeg bij Meer</u></button>';
+  if(S.sync.err&&S.sync.code==='schema')return '<span class="flag warn">'+ic('alert')+'RBFA-kalender wordt even niet bijgewerkt</span>';
   if(S.sync.err)return '<button class="flag bad" data-a="syncNow">'+ic('alert')+'RBFA niet bereikbaar: <u>opnieuw</u></button>';
   if(r.lastChangesAt&&Date.now()-new Date(r.lastChangesAt).getTime()<3*864e5&&(r.lastChanges||[]).length)return '<button class="flag info" data-a="changesOpen">'+ic('info')+'RBFA: '+r.lastChanges.length+(r.lastChanges.length>1?' wijzigingen':' wijziging')+' verwerkt '+esc(isoStamp(r.lastChangesAt))+'</button>';
   return '';
@@ -555,6 +579,7 @@ function viewCal(){
     '<label class="chk"><input type="checkbox" data-ch="showPast"'+(S.showPast?' checked':'')+'> Toon voorbije weken</label>'+
     '<button class="btn ghost" data-a="syncNow"'+(S.sync.busy?' disabled':'')+'>'+ic(S.sync.busy?'spin':'download')+(S.sync.busy?'RBFA nakijken…':'RBFA nakijken')+'</button>'+
     '<button class="btn ghost" data-a="newMatch">'+ic('plus')+'Match toevoegen</button>'+
+    '<button class="btn ghost" data-a="rota">'+ic('shirt')+'Waslijst</button>'+
     '<button class="btn primary" data-a="calExport"'+(selN?'':' disabled')+'>'+ic('download')+(selN?'Exporteer '+selN+(selN>1?' speeldagen':' speeldag'):'Exporteer selectie')+'</button></section>'+(selN?'':'<p class="hint" style="margin-top:-4px">Vink een of meer speeldagen aan om ze samen te exporteren.</p>');
   if(!wks.length)return h+'<div class="empty"><b>Nog geen matchen</b>Zodra de RBFA-kalender ingeladen is, verschijnen hier alle matchen van Hechtel A en B.</div>';
   h+='<div class="cal">'+wks.map(function(wk){
@@ -589,7 +614,7 @@ function viewPlayers(){
     return '<section class="panel pcol'+(S.ptab===k?' on':'')+'"><div class="ph"><h2>'+esc(title)+' <span class="cnt">'+act+'</span></h2>'+tot+'</div>'+(groups[k].map(function(p){return prow(p,st,gs);}).join('')||'<p class="hint">Nog geen spelers.</p>')+'</section>';}
   var h='<section class="ptop"><h1>Spelers</h1>'+
     '<form class="padd" data-form="addPlayer"><input type="text" id="np-name" placeholder="Nieuwe speler, bv. Tibo V" autocomplete="off" aria-label="Naam nieuwe speler"><select id="np-team" aria-label="Ploeg"><option value="A">'+esc(teamLabel('A'))+'</option><option value="B">'+esc(teamLabel('B'))+'</option><option value="X">Extern</option></select><button class="btn primary" type="submit">'+ic('plus')+'Toevoegen</button></form></section>';
-  if(review.length)h+='<div class="review">'+review.map(function(p){return '<div class="rrow"><span>'+ic('alert')+'<span><b>'+esc(p.name)+'</b> staat nieuw in de RBFA-spelerslijst'+(p.suggestTeam?', speelde al bij '+esc(teamLabel(p.suggestTeam)):'')+'. Bij welke ploeg hoort hij of zij?</span></span><span class="ract"><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="A">A</button><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="B">B</button><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="X">Extern</button></span></div>';}).join('')+'</div>';
+  if(review.length)h+='<div class="review">'+review.map(function(p){return '<div class="rrow"><span>'+ic('alert')+'<span><b>'+esc(p.name)+'</b> staat nieuw in de RBFA-spelerslijst'+(p.suggestTeam?', speelde al bij '+esc(teamLabel(p.suggestTeam)):'')+'. Bij welke ploeg hoort hij of zij? Staat die al onder een andere naam in de lijst, tik dan op Negeren.</span></span><span class="ract"><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="A">A</button><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="B">B</button><button class="btn sm" data-a="pTeam" data-p="'+esc(p.id)+'" data-to="X">Extern</button><button class="btn sm ghost" data-a="pIgnore" data-p="'+esc(p.id)+'" title="Staat al in de lijst onder een andere naam">Negeren</button></span></div>';}).join('')+'</div>';
   var sn=(cfg().rbfa||{}).seasonNotice,gone=(sn&&sn.gone)?sn.gone.filter(function(id){var p=S.players.get(id);return p&&p.active!==false;}):[];
   if(gone.length)h+='<div class="review"><div class="rrow"><span>'+ic('info')+'<span>Nieuw seizoen: <b>'+esc(gone.map(pName).join(', '))+'</b> '+(gone.length>1?'staan':'staat')+' niet bij '+esc(sn.teams.A)+' of '+esc(sn.teams.B)+' in RBFA. Inactief zetten? De historiek blijft bewaard.</span></span><span class="ract"><button class="btn sm" data-a="goneOff">Inactief zetten</button><button class="btn sm ghost" data-a="goneKeep">Laten staan</button></span></div></div>';
   h+='<div class="seg mob" style="margin-bottom:12px">'+['A','B','X'].map(function(k){return '<button data-a="ptab" data-k="'+k+'" aria-pressed="'+(S.ptab===k)+'">'+(k==='X'?'Extern':esc(teamLabel(k)))+' ('+groups[k].filter(function(p){return p.active!==false;}).length+')</button>';}).join('')+'</div>';
@@ -632,7 +657,7 @@ function viewMore(){
   h+='<section class="panel"><h2 style="margin-bottom:6px">Speeldagen</h2><p class="hint">De nummering start op de week van speeldag 1. Begint er een nieuwe reeks (bv. na de winterstop), voeg dan de datum van de nieuwe speeldag 1 toe.</p><div class="phases">'+
     ph.map(function(d,i){return '<div class="phase"><input type="date" id="ph-'+i+'" data-ch="phase" data-i="'+i+'" value="'+esc(d)+'"><span class="hint">speeldag 1'+(i?' (reeks '+(i+1)+')':'')+'</span><button class="btn sm ghost" data-a="phaseDel" data-i="'+i+'" aria-label="Verwijder">'+ic('trash')+'</button></div>';}).join('')+
     '<div class="phase"><input type="date" id="ph-new" data-ch="phaseAdd" aria-label="Nieuwe reeks"><span class="hint">nieuwe reeks toevoegen</span></div></div></section>';
-  h+='<section class="panel"><h2 style="margin-bottom:6px">Was + broodjes per week</h2>'+histHTML()+'</section>';
+  h+='<section class="panel"><div class="ph"><h2>Was + broodjes per week</h2><button class="btn sm primary" data-a="rota">'+ic('share')+'Waslijst delen</button></div>'+histHTML()+'</section>';
   if(S.admin){var lo=c.live||{};
     h+='<section class="panel"><h2 style="margin-bottom:6px">Wissels tijdens de match</h2><p class="hint" style="font-size:14px">Met de knop Wissels op de matchkaart houd je tijdens de match bij wie er speelt: aanwezigen, basisopstelling, en per speler de speelminuten en hoe vaak hij op de bank zat. De planner stelt telkens de eerlijkste volgende wissel voor.</p>'+
       '<label class="chk" style="margin-top:6px"><input type="checkbox" data-ch="lvAll"'+(lo.all?' checked':'')+'> Zichtbaar voor alle trainers</label>'+
@@ -643,7 +668,7 @@ function viewMore(){
     return fld('RBFA-ploeg voor '+teamLabel(k),'<select id="rb-team-'+k+'" data-ch="teamPick" data-k="'+k+'">'+opts+'</select>');};
   h+='<section class="panel wide"><div class="ph"><h2>RBFA</h2><button class="btn sm primary" data-a="syncNow"'+(S.sync.busy?' disabled':'')+'>'+ic(S.sync.busy?'spin':'download')+(S.sync.busy?'Bezig…':'Nu nakijken')+'</button></div>'+
     '<p class="hint" style="font-size:14px">Bij het openen kijkt de planner de RBFA-kalender en spelerslijsten van '+esc(c.club)+(r.clubNr?' (stamnummer '+esc(r.clubNr)+')':'')+' na, hoogstens om de 20 minuten. Nieuwe of verplaatste matchen, nieuwe tegenstanders met hun rijtijd en nieuwe spelers worden meteen verwerkt. Wat je zelf aanpaste, blijft behouden.'+(r.lastSync?' Laatst nagekeken: '+esc(isoStamp(r.lastSync))+'.':'')+'</p>'+
-    (S.sync.err?'<p><span class="flag bad">'+ic('alert')+esc(S.sync.err)+'</span></p>':'')+
+    (S.sync.err?'<p><span class="flag bad">'+ic('alert')+esc(S.sync.err)+'</span></p>':'')+(S.sync.warn?'<p><span class="flag warn" title="'+esc(S.sync.warnTech||'')+'">'+ic('alert')+esc(S.sync.warn)+'</span></p>':'')+
     '<div class="form" style="margin-top:8px">'+picker('A')+picker('B')+'</div>'+
     '<p class="hint">Nieuw seizoen of andere ploegen? Kies hier de RBFA-ploegen. RBFA geeft elk seizoen nieuwe ploegnummers; de planner zoekt de ploeg op naam.</p>'+
     ((r.lastChanges||[]).length?'<p><button class="btn sm" data-a="changesOpen">Laatste wijzigingen uit RBFA</button></p>':'')+
@@ -664,7 +689,8 @@ function histHTML(){
   allMatches().forEach(function(m){var wk=weekOf(m);if(!groups.has(wk))groups.set(wk,{A:[],B:[]});var g=groups.get(wk);(g[m.team]||(g[m.team]=[])).push(m);});
   var wks=Array.from(groups.keys()).sort().filter(function(wk){var g=groups.get(wk);return wk<=mondayOf(t)||g.A.concat(g.B).some(function(m){return m.wasId;});});
   if(!wks.length)return '<p class="hint">Nog niets ingevuld.</p>';
-  function cell(arr){if(!arr.length)return '<td class="mutedt">geen match</td>';return '<td'+(arr.some(function(m){return wasOf(m);})?' class="g"':'')+'>'+arr.map(function(m){if(m.status==='geannuleerd')return '<span class="mutedt">geannuleerd</span>';var w=wasOf(m);return w?esc(pName(w)):'<span class="mutedt">niet ingevuld</span>';}).join(', ')+'</td>';}
+  function cell(arr){if(!arr.length)return '<td class="mutedt">geen match</td>';arr=arr.slice().sort(cmpEff);var multi=arr.length>1;
+    return '<td'+(arr.some(function(m){return wasOf(m);})?' class="g"':'')+'>'+arr.map(function(m){var dt=multi?' <small class="hd">'+esc(dShort(eff(m).date))+'</small>':'';if(m.status==='geannuleerd')return '<span class="mutedt">geannuleerd</span>'+dt;var w=wasOf(m);return (w?esc(pName(w)):'<span class="mutedt">niet ingevuld</span>')+dt;}).join('<br>')+'</td>';}
   return '<div class="histwrap"><table class="hist"><thead><tr><th>Week</th><th>'+esc(teamLabel('A'))+'</th><th>'+esc(teamLabel('B'))+'</th></tr></thead><tbody>'+
     wks.reverse().map(function(wk){var g=groups.get(wk);return '<tr><td>'+esc(weekTitle(wk))+'<br><span class="mutedt" style="font-size:12px">'+esc(dayMonth(wk))+'</span></td>'+cell(g.A)+cell(g.B)+'</tr>';}).join('')+'</tbody></table></div>';
 }
@@ -672,7 +698,7 @@ function histHTML(){
 /* ================= sheets ================= */
 function openSheet(kind,args){S.sheet=Object.assign({kind:kind},args||{});renderSheet();$('#sheet').hidden=false;document.body.classList.add('noscroll');var sh=$('.sheet');if(sh)sh.scrollTop=0;}
 function closeSheet(){S.sheet=null;$('#sheet').hidden=true;$('#sheetBody').innerHTML='';document.body.classList.remove('noscroll');render();}
-function renderSheet(){var sh=S.sheet;if(!sh)return;var fn=SHEETS[sh.kind];$('#sheetBody').innerHTML=fn?fn(sh):'';if(sh.kind==='export')prepareExport();}
+function renderSheet(){var sh=S.sheet;if(!sh)return;var fn=SHEETS[sh.kind];$('#sheetBody').innerHTML=fn?fn(sh):'';if(sh.kind==='export')prepareExport();if(sh.kind==='rota')prepareRota();}
 function acts(left,right){return '<div class="sheet-actions">'+(left||'')+right+'</div>';}
 var SHEETS={
   status:function(sh){var m=getM(sh.id);if(!m)return '';var e=eff(m),st=sh.st||m.status||'gepland';
@@ -745,7 +771,7 @@ var SHEETS={
       '<label class="fld"><span>Naam op het schema</span><input type="text" id="pl-name" value="'+esc(p.name)+'" autocomplete="off"></label>'+
       '<div class="fld"><span>Vaste ploeg</span><div class="seg">'+['A','B','X'].map(function(t){return '<button data-a="plTeam" data-v="'+t+'" aria-pressed="'+(team===t)+'">'+(t==='X'?'Extern':esc(teamLabel(t)))+'</button>';}).join('')+'</div></div>'+
       '<div class="row2"><label class="fld"><span>Plaats in de lijst</span><input type="number" inputmode="numeric" id="pl-order" value="'+esc(p.order==null?'':p.order)+'"></label><label class="chk" style="align-self:center;margin-top:14px"><input type="checkbox" id="pl-active"'+(p.active!==false?' checked':'')+'> Actief</label></div>'+
-      '<p class="hint">Een inactieve speler staat niet meer standaard in de selectie (bv. bij een blessure), maar blijft in de historiek.'+(p.rbfaId?' Gekoppeld aan de RBFA-spelerslijst.':'')+'</p>'+
+      '<p class="hint">Een inactieve speler staat niet meer standaard in de selectie (bv. bij een blessure), maar blijft in de historiek.'+(p.rbfaKey?' Gekoppeld aan de RBFA-spelerslijst.':'')+'</p>'+
       acts('<button class="btn ghost danger spacer" data-a="delPlayer" data-confirm="Tik nogmaals om te verwijderen">'+ic('trash')+'Verwijderen</button>','<button class="btn ghost" data-a="closeSheet">Annuleer</button><button class="btn primary" data-a="savePlayer">Opslaan</button>');},
   changes:function(){var r=cfg().rbfa||{},ch=r.lastChanges||[];
     return '<h2>Laatste RBFA-update</h2><p class="sub">'+(r.lastChangesAt?'Verwerkt '+esc(isoStamp(r.lastChangesAt))+'. ':'')+(r.lastSync?'Laatst nagekeken '+esc(isoStamp(r.lastSync))+'.':'')+'</p>'+
@@ -765,7 +791,16 @@ var SHEETS={
     if(!single)h+='<p class="hint">De PDF krijgt één pagina per speeldag. Delen en JPEG geven één afbeelding per speeldag.</p>';
     var canShare=!!(navigator.share&&navigator.canShare);
     h+=acts('<button class="btn ghost spacer" data-a="closeSheet">Sluiten</button>','<button class="btn" data-a="expDl" data-f="pdf" id="exp-pdf" disabled>'+ic('download')+'PDF</button><button class="btn'+(canShare?'':' primary')+'" data-a="expDl" data-f="jpg" id="exp-jpg" disabled>'+ic('download')+'JPEG</button>'+(canShare?'<button class="btn primary" data-a="expShare" id="exp-share" disabled>'+ic('share')+'Delen</button>':''));
-    return h;}
+    return h;},
+  rota:function(sh){var all=rotaWeeks();
+    if(!all.length)return '<h2>Waslijst</h2><p class="sub">Er staan geen komende matchen in de planner.</p>'+acts('','<button class="btn ghost" data-a="closeSheet">Sluiten</button>');
+    if(!sh.upto||all.indexOf(sh.upto)<0)sh.upto=all[all.length-1];
+    var wks=all.filter(function(w){return w<=sh.upto;}),pend=rotaPending(wks),canShare=!!(navigator.share&&navigator.canShare);
+    return '<h2>Waslijst</h2><p class="sub">Wie wanneer de was en de broodjes doet, om te delen met de ouders.</p>'+
+      '<label class="fld"><span>Tot en met</span><select data-ch="rotaUpto">'+all.map(function(w){return '<option value="'+esc(w)+'"'+(w===sh.upto?' selected':'')+'>'+esc(weekTitle(w))+' ('+esc(weekRange(w))+')</option>';}).join('')+'</select></label>'+
+      (pend.length?'<p class="callout">'+ic('shirt')+'<span>Na het delen of downloaden '+(pend.length>1?'worden '+pend.length+' voorstellen':'wordt 1 voorstel')+' vastgelegd als was + broodjes. Per match kan je het daarna nog wijzigen.</span></p>':'')+
+      '<div class="preview" id="rota-prev"><span class="hint">Voorbeeld wordt gemaakt…</span></div>'+
+      acts('<button class="btn ghost spacer" data-a="closeSheet">Sluiten</button>','<button class="btn" data-a="rotaDl" data-f="pdf" id="rota-pdf" disabled>'+ic('download')+'PDF</button><button class="btn'+(canShare?'':' primary')+'" data-a="rotaDl" data-f="jpg" id="rota-jpg" disabled>'+ic('download')+'JPEG</button>'+(canShare?'<button class="btn primary" data-a="rotaShare" id="rota-share" disabled>'+ic('share')+'Delen</button>':''));}
 };
 function oppFields(o){var v=o.venue||{},addr=venueText(v);
   return fld('Naam op het schema','<input type="text" id="of-name" value="'+esc(o.name||'')+'" placeholder="bv. KFC Hamont" autocomplete="off">')+
@@ -878,6 +913,68 @@ function finishExport(sh){var rd=sh&&sh.ready;if(!rd)return;var fixed=[],now=new
   rd.jobs.forEach(function(j){j.ids.forEach(function(id){var m=getM(id),s=rd.sugg.get(id);if(m&&!m.wasId&&m.status!=='geannuleerd'&&s){upd('matches',id,{wasId:s,updatedAt:now});fixed.push(m.team+' '+pName(s));}});
     var w=S.weeks.get(j.wk);write('weeks',j.wk,w?'update':'set',{exportedAt:now});});
   toast(fixed.length?'Klaar. Was + broodjes vastgelegd: '+fixed.join(', ')+'.':'Klaar.');}
+/* ---------- waslijst: was + broodjes voor de komende speeldagen, één regel per match ---------- */
+function rotaWeeks(){var t=today(),set=new Set();allMatches().forEach(function(m){if(m.onSchema!==false&&eff(m).date>=t)set.add(weekOf(m));});return Array.from(set).sort();}
+function rotaEntries(wk,team){var t=today();return matchesInWeek(wk).filter(function(m){return m.team===team&&m.onSchema!==false;}).sort(cmpEff).map(function(m){var d=eff(m).date,cancel=m.status==='geannuleerd';return {m:m,date:d,past:d<t,opp:oppName(m),cancel:cancel,was:cancel?null:(wasOf(m)||S.sugg.get(m.id)||null)};});}
+function rotaRange(wk){var ds=uniq(rotaEntries(wk,'A').concat(rotaEntries(wk,'B')).map(function(e){return e.date;})).sort();if(!ds.length)return 'week van '+dayMonth(wk);
+  var a=ds[0],b=ds[ds.length-1];if(a===b)return DAYS[dow(a)]+' '+dayMonth(a);
+  return DSH[dow(a)]+' '+(a.slice(0,7)===b.slice(0,7)?Number(a.slice(8)):dayMonth(a))+' tot '+DSH[dow(b)]+' '+dayMonth(b);}
+function rotaPending(wks){var out=[];wks.forEach(function(wk){matchesInWeek(wk).forEach(function(m){if(m.onSchema!==false&&!m.wasId&&m.status!=='geannuleerd'&&S.sugg.get(m.id))out.push(m);});});return out;}
+function drawRota(wks,scale){
+  var W=1440,M=64,TW=W-2*M,c1=340,cw=(TW-c1)/2,pad=22,EH=80,GAP=12,meas=document.createElement('canvas').getContext('2d');
+  function fit(t,f,max){meas.font=f;t=String(t);if(meas.measureText(t).width<=max)return t;while(t.length>1&&meas.measureText(t+'…').width>max)t=t.slice(0,-1);return t.replace(/[\s·]+$/,'')+'…';}
+  var rows=wks.map(function(wk){var cols=[rotaEntries(wk,'A'),rotaEntries(wk,'B')],n=Math.max(1,cols[0].length,cols[1].length);return {wk:wk,cols:cols,h:Math.max(84,n*EH+(n-1)*GAP)+2*pad};});
+  var HH=62,H=M+58+50+26+HH+rows.reduce(function(a,r){return a+r.h;},0)+40+M;
+  var cv=document.createElement('canvas');cv.width=Math.round(W*scale);cv.height=Math.round(H*scale);
+  var ctx=cv.getContext('2d');ctx.scale(scale,scale);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);ctx.textBaseline='alphabetic';
+  var y=M,title='Was + broodjes';
+  ctx.font=XF(700,46);ctx.fillStyle=XC.ink;ctx.fillText(title,M,y+42);ctx.fillRect(M,y+50,ctx.measureText(title).width,3);y+=58;
+  var sub=(cfg().club||'Hechtel')+' U11 · '+weekTitle(wks[0])+(wks.length>1?' tot '+weekTitle(wks[wks.length-1]):'');
+  ctx.font=XF(500,30);ctx.fillStyle=XC.grey;ctx.fillText(fit(sub,XF(500,30),TW),M,y+38);y+=50+26;
+  var X=[M,M+c1,M+c1+cw],tot=HH+rows.reduce(function(a,r){return a+r.h;},0);
+  ctx.fillStyle='#EEF2EF';ctx.fillRect(M,y,TW,HH);
+  ctx.font=XF(700,28);ctx.fillStyle=XC.ink;[['Speeldag',0],[teamLabel('A'),1],[teamLabel('B'),2]].forEach(function(c){ctx.fillText(fit(c[0],XF(700,28),(c[1]?cw:c1)-2*pad),X[c[1]]+pad,y+41);});
+  var yy=y+HH;
+  rows.forEach(function(r,ri){
+    ctx.font=XF(700,32);ctx.fillStyle=XC.ink;ctx.fillText(fit(weekTitle(r.wk),XF(700,32),c1-2*pad),X[0]+pad,yy+pad+32);
+    ctx.font=XF(500,26);ctx.fillStyle=XC.grey;ctx.fillText(fit(rotaRange(r.wk),XF(500,26),c1-2*pad),X[0]+pad,yy+pad+68);
+    r.cols.forEach(function(list,ci){var x=X[ci+1]+pad,mw=cw-2*pad,ey=yy+pad;
+      if(!list.length){ctx.font=XF(500,28,true);ctx.fillStyle='#9A9A9A';ctx.fillText('geen match',x,ey+34);return;}
+      list.forEach(function(e,i){var top=ey+i*(EH+GAP);
+        if(e.cancel){ctx.font=XF(600,30);ctx.fillStyle='#9A9A9A';ctx.fillText('geannuleerd',x,top+34);}
+        else if(e.was){ctx.font=XF(700,34);ctx.fillStyle=XC.green;ctx.fillText(fit(pName(e.was),XF(700,34),mw),x,top+34);}
+        else{ctx.font=XF(500,30,true);ctx.fillStyle='#9A9A9A';ctx.fillText(e.past?'niet ingevuld':'nog niet ingevuld',x,top+34);}
+        ctx.font=XF(500,26);ctx.fillStyle=XC.grey;ctx.fillText(fit(dShort(e.date)+' · '+e.opp,XF(500,26),mw),x,top+70);});
+    });
+    yy+=r.h;
+    if(ri<rows.length-1){ctx.fillStyle='#D5D9D6';ctx.fillRect(M,yy-1,TW,2);}
+  });
+  ctx.strokeStyle='#D5D9D6';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X[1],y);ctx.lineTo(X[1],y+tot);ctx.moveTo(X[2],y);ctx.lineTo(X[2],y+tot);ctx.stroke();
+  ctx.strokeStyle=XC.line;ctx.lineWidth=2;ctx.strokeRect(M,y,TW,tot);
+  ctx.font=XF(500,22);ctx.fillStyle='#8A8A8A';ctx.fillText('Opgemaakt op '+stamp(),M,H-M+14);
+  return cv;
+}
+function setRotaButtons(on){var rd=S.sheet&&S.sheet.ready;['rota-pdf','rota-jpg','rota-share'].forEach(function(id){var b=$('#'+id);if(b)b.disabled=!on||(id==='rota-pdf'&&!(rd&&rd.pdf));});}
+function prepareRota(){var sh=S.sheet;if(!sh||sh.kind!=='rota')return;var tok=++prevTok;sh.ready=null;setRotaButtons(false);
+  var wks=rotaWeeks().filter(function(w){return w<=sh.upto;});if(!wks.length)return;
+  Promise.all([fontsReady(),loadPdf().catch(function(){return null;})]).then(function(){
+    if(tok!==prevTok||S.sheet!==sh)return;
+    var sugg=new Map(S.sugg),pv=drawRota(wks,0.55),box=$('#rota-prev');
+    if(box){var img=new Image();img.alt='Voorbeeld van de waslijst';img.src=pv.toDataURL('image/png');box.innerHTML='';box.appendChild(img);}
+    var nm=('Hechtel U11 waslijst '+weekTitle(wks[0])+(wks.length>1?' tot '+weekTitle(wks[wks.length-1]):'')).replace(/[\\/:*?"<>|]/g,'-');
+    return new Promise(function(res){drawRota(wks,1.25).toBlob(function(b){res(new File([b],nm+'.jpg',{type:'image/jpeg'}));},'image/jpeg',0.92);}).then(function(jpg){
+      if(tok!==prevTok||S.sheet!==sh)return;
+      var pdf=null;
+      if(window.jspdf){var jsPDF=window.jspdf.jsPDF,doc=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+        for(var i=0;i<wks.length;i+=12){if(i)doc.addPage();var cv=drawRota(wks.slice(i,i+12),1.6),ra=cv.height/cv.width,w=186,h=w*ra;if(h>273){h=273;w=h/ra;}doc.addImage(cv.toDataURL('image/jpeg',0.9),'JPEG',12,12,w,h);}
+        pdf=new File([doc.output('blob')],nm+'.pdf',{type:'application/pdf'});}
+      sh.ready={wks:wks,jpg:jpg,pdf:pdf,sugg:sugg};setRotaButtons(true);
+    });
+  }).catch(function(e){var box=$('#rota-prev');if(box)box.innerHTML='<span class="hint">Voorbeeld lukt niet: '+esc(e&&e.message||e)+'</span>';});
+}
+function finishRota(sh){var rd=sh&&sh.ready;if(!rd)return;var n=0,now=new Date().toISOString();
+  rd.wks.forEach(function(wk){matchesInWeek(wk).forEach(function(m){var s=rd.sugg.get(m.id);if(m.onSchema!==false&&!m.wasId&&m.status!=='geannuleerd'&&s){upd('matches',m.id,{wasId:s,updatedAt:now});n++;}});});
+  toast(n?'Klaar. '+n+(n>1?' beurten':' beurt')+' was + broodjes vastgelegd.':'Klaar.');if(n&&S.sheet===sh)renderSheet();}
 function importBackup(text){var d=null;try{d=JSON.parse(text);}catch(e){}
   if(!d||d.app!=='hechtel-u11-backup'||!d.collections){toast('Dit is geen back-up van de planner.');return;}
   var n=0,cols=d.collections;
@@ -971,6 +1068,7 @@ var ACT={
   delPlayer:function(){var id=S.sheet.id,nm=pName(id);write('players',id,'delete',null);closeSheet();toast(nm+' verwijderd.');},
   pMove:function(d){var p=S.players.get(d.p);if(!p)return;var prev={team:p.team,prevTeam:p.prevTeam||null,movedAt:p.movedAt||null};upd('players',d.p,moveP(p,d.to));toast(p.name+' staat nu bij '+teamLabel(d.to),function(){upd('players',d.p,prev);});},
   pTeam:function(d){upd('players',d.p,{team:d.to,review:false,active:true});},
+  pIgnore:function(d){var p=S.players.get(d.p);if(!p)return;if(p.rbfaKey)saveCfg('rbfa.ignored',uniq(((cfg().rbfa||{}).ignored||[]).concat('player:'+p.rbfaKey)));write('players',p.id,'delete',null);toast(p.name+' wordt niet meer voorgesteld.');},
   ptab:function(d){S.ptab=d.k;render();},
   export:function(){openSheet('export',{weeks:[S.week]});},
   calExport:function(){var wks=Array.from(S.calSel).sort();if(!wks.length)return;openSheet('export',{weeks:wks});},
@@ -979,6 +1077,12 @@ var ACT={
     if(!ok){files.forEach(function(f,i){setTimeout(function(){dlFile(f);},i*400);});finishExport(sh);return;}
     navigator.share({files:files}).then(function(){finishExport(sh);},function(e){if(!e||e.name!=='AbortError'){files.forEach(function(f,i){setTimeout(function(){dlFile(f);},i*400);});finishExport(sh);}});},
   expDl:function(d){var sh=S.sheet;if(!sh||!sh.ready)return;if(d.f==='pdf'){if(!sh.ready.pdf)return;dlFile(sh.ready.pdf);}else sh.ready.jpgs.forEach(function(f,i){setTimeout(function(){dlFile(f);},i*400);});finishExport(sh);},
+  rota:function(){openSheet('rota');},
+  rotaDl:function(d){var sh=S.sheet;if(!sh||!sh.ready)return;if(d.f==='pdf'){if(!sh.ready.pdf)return;dlFile(sh.ready.pdf);}else dlFile(sh.ready.jpg);finishRota(sh);},
+  rotaShare:function(){var sh=S.sheet;if(!sh||!sh.ready)return;var files=[sh.ready.jpg],ok=false;
+    try{ok=!!(navigator.canShare&&navigator.canShare({files:files}));}catch(e){}
+    if(!ok){dlFile(files[0]);finishRota(sh);return;}
+    navigator.share({files:files}).then(function(){finishRota(sh);},function(e){if(!e||e.name!=='AbortError'){dlFile(files[0]);finishRota(sh);}});},
   syncNow:function(){syncRbfa(true);},
   changesOpen:function(){openSheet('changes');},
   signOut:function(){if(S.sheet)closeSheet();AUTH.signOut().then(function(){S.login=null;});},
@@ -1004,6 +1108,7 @@ var CH={
   cfg:function(el){var v=el.value;if(el.dataset.num)v=v===''?0:Number(v);if(el.dataset.list)v=splitNames(v);saveCfg(el.dataset.k,v);},
   phase:function(el){var ph=(cfg().phases||[]).slice();ph[Number(el.dataset.i)]=el.value;saveCfg('phases',ph.filter(Boolean).sort());},
   phaseAdd:function(el){if(!el.value)return;var ph=(cfg().phases||[]).slice();ph.push(el.value);saveCfg('phases',uniq(ph).sort());el.value='';},
+  rotaUpto:function(el){if(S.sheet&&S.sheet.kind==='rota'){S.sheet.upto=el.value;renderSheet();}},
   mdOpp:function(el){var box=$('#md-new');if(box)box.hidden=el.value!=='__new';if(S.sheet&&S.sheet.d)S.sheet.d.opponentId=el.value;}
 };
 

@@ -35,12 +35,12 @@ Op een iPhone opent de link uit de mail soms in een andere browser dan de app op
 Voor de trainers is er een korte handleiding met screenshots: `handleiding.html`, ook te openen via het vraagteken bovenaan in de planner en via de link op het inlogscherm. De namen op die screenshots zijn voorbeelden.
 
 - **Speeldag:** de matchen van één week. Tik op een speler om hem uit de selectie te halen, op het shirtje voor was + broodjes, op het verzameluur om het aan te passen. Exporteer als JPEG of PDF, of deel meteen via WhatsApp.
-- **Kalender:** alle weken onder elkaar. Vink meerdere speeldagen aan om ze samen te exporteren.
+- **Kalender:** alle weken onder elkaar. Vink meerdere speeldagen aan om ze samen te exporteren. De knop **Waslijst** maakt één afbeelding (of PDF) met per komende speeldag wie de was doet bij A en B, elke match apart met dag en tegenstander. Ook te openen bij Meer > Was + broodjes per week.
 - **Spelers:** de ploeglijsten van A en B zijn het sjabloon voor elke nieuwe match. Verhuis spelers tussen A en B, voeg externe spelers toe, zet iemand inactief. Een blauw label ("2× bij B") toont hoe vaak een speler dit seizoen met de andere ploeg meespeelde, met bovenaan het totaal per ploeg. Beide tellers (ook het shirtje van was + broodjes) tellen alleen gespeelde matchen; wat al ingepland staat, verschijnt als een gestippelde +1.
 - **Wissels:** de knop op de matchkaart opent de wisseltool: wie is er, basisopstelling, en tijdens de match per speler de speelminuten en hoe vaak hij op de bank zat, met een voorstel voor de eerlijkste volgende wissel. Uitleg met screenshots: `wissels.html`. De eigenaar zet de knop aan voor alle trainers bij Meer > Wissels tijdens de match.
 - **Meer:** tegenstanders en rijtijden, verzamelregels, trainers, speeldagnummering, RBFA-ploegen, toegang en back-up.
 
-Was + broodjes: de planner stelt per ploeg per week iemand voor, op basis van wie het dit seizoen het minst en het langst geleden deed. Bij het delen of downloaden van het schema wordt het voorstel vastgelegd.
+Was + broodjes: de planner stelt per ploeg per week iemand voor, op basis van wie het dit seizoen het minst en het langst geleden deed. Bij het delen of downloaden van het schema of de waslijst wordt het voorstel vastgelegd.
 
 ## Nieuw seizoen
 
@@ -58,6 +58,7 @@ Meer > Back-up > Back-up downloaden geeft een JSON-bestand met alle gegevens. Me
 | Deze website staat nog niet bij de toegelaten domeinen | Stap 3 van de installatie. |
 | Vandaag zijn er al 5 inloglinks verstuurd | Limiet van het gratis plan, morgen opnieuw proberen. |
 | RBFA niet bereikbaar | Later opnieuw proberen. Blijft het, dan is de RBFA-website mogelijk gewijzigd. |
+| RBFA-kalender wordt even niet bijgewerkt | De RBFA veranderde zijn gegevens (GraphQL-schema). Pas de vragen `Q_CAL`, `Q_DET` of `Q_MEM` in `app.js` aan. Lukt enkel het terrein of de spelerslijst niet, dan wordt de kalender toch bijgewerkt en staat er een melding bij Meer > RBFA. |
 | Ploeg U11 A niet gevonden | Kies de juiste ploeg bij Meer > RBFA. |
 | Rijtijd ontbreekt | Tik op de melding en vul de rijtijd in bij de tegenstander. |
 
@@ -70,4 +71,4 @@ Meer > Back-up > Back-up downloaden geeft een JSON-bestand met alle gegevens. Me
 - `wissels.html` en `ws-*.png`: uitleg over de wisseltool, ook met fictieve namen.
 - `firebase-*-compat.js` en `jspdf.umd.min.js`: Firebase JS SDK 10.12.2 (compat) en jsPDF 2.5.1, zelf gehost.
 - Collecties in Firestore: `config/main`, `players`, `opponents`, `matches`, `weeks` (titel en exportdatum per week, sleutel = maandag), `members` (sleutel = e-mailadres, `role`: `trainer` of `admin`), `games` (wissels per match, sleutel = match-id: aanwezigen, basisopstelling, klok en een lijst gebeurtenissen met de matchtijd in seconden; speelminuten worden daaruit berekend).
-- RBFA: GraphQL op `datalake-prod2018.rbfa.be` (clubTeams, teamCalendar, matchDetail, teamMembers). Club 1416, stamnummer 02662.
+- RBFA: GraphQL op `datalake-prod2018.rbfa.be` (clubTeams, teamCalendar, matchDetail, teamMembers). Club 1416, stamnummer 02662. Sinds november 2026 geeft de RBFA geen `eventType` en geen speler-id meer. Het soort match volgt uit de reeks-id (`FRN_…` oefenmatch, `CHP_…` competitie). Spelers worden op naam herkend: in Firestore staat alleen een hash van de volledige naam (`rbfaKey`), geen achternaam.
